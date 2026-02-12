@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>macOS System Cleaner</title>
+<style>
+:root {
+  --bg:#0d1117; --s1:#161b22; --s2:#21262d; --s3:#292e36;
+  --bd:#30363d; --t1:#e6edf3; --t2:#8b949e; --t3:#6e7681;
+  --ac:#58a6ff; --gn:#3fb950; --yw:#d29922; --rd:#f85149; --pp:#bc8cff; --or:#db6d28;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;background:var(--bg);color:var(--t1);line-height:1.6}
+.wrap{max-width:960px;margin:0 auto;padding:20px 24px 110px}
+
+.hdr{text-align:center;padding:28px 0 20px}
+.hdr h1{font-size:24px;font-weight:700}
+.hdr p{color:var(--t2);font-size:13px;margin-top:4px}
+
+/* Disk */
+.dsk{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:18px;margin-bottom:18px}
+.dsk-top{display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.dsk-bar{background:var(--s2);border-radius:8px;height:22px;overflow:hidden;margin:10px 0}
+.dsk-fill{height:100%;border-radius:8px;transition:width .5s}
+.dsk-row{display:flex;justify-content:space-between;font-size:13px;color:var(--t2)}
+.dsk-row strong{color:var(--t1)}
+
+/* Summary */
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+.sc{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:14px;text-align:center}
+.sc .v{font-size:24px;font-weight:700;margin:2px 0}
+.sc .l{font-size:11px;color:var(--t2)}
+.v-r{color:var(--rd)} .v-g{color:var(--gn)} .v-y{color:var(--yw)}
+
+/* TM */
+.tm{background:var(--s1);border:1px solid var(--bd);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px}
+.tm code{background:var(--s2);padding:2px 6px;border-radius:4px;font-size:11px}
+
+/* Buttons */
+.btn{border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;transition:all .12s;display:inline-flex;align-items:center;gap:4px}
+.btn:hover{filter:brightness(1.15)} .btn:active{transform:scale(.97)}
+.btn-a{background:var(--ac);color:#fff} .btn-d{background:var(--rd);color:#fff}
+.btn-o{background:transparent;color:var(--t1);border:1px solid var(--bd)} .btn-o:hover{background:var(--s2)}
+.btn-sm{padding:5px 10px;font-size:11px} .btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* Action bar */
+.abar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.abar .left{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Group */
+.grp{background:var(--s1);border:1px solid var(--bd);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.grp-head{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;user-select:none;transition:background .12s}
+.grp-head:hover{background:var(--s2)}
+.grp-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px}
+.grp-size{font-size:13px;color:var(--t2)}
+.grp-body{border-top:1px solid var(--bd)}
+
+/* Row */
+.row{display:flex;align-items:flex-start;padding:10px 16px;gap:10px;border-bottom:1px solid var(--bd);transition:background .1s}
+.row:last-child{border-bottom:none} .row:hover{background:rgba(255,255,255,.02)}
+.row.sel{background:rgba(88,166,255,.06)}
+.row.done{background:rgba(63,185,80,.04);opacity:.6;text-decoration:line-through;transition:opacity .4s,max-height .4s;max-height:200px;overflow:hidden}
+.row.fade-out{opacity:0;max-height:0;padding:0 16px;margin:0;border:none}
+
+.row-chk{flex-shrink:0;padding-top:1px}
+.row-chk input{width:15px;height:15px;cursor:pointer;accent-color:var(--ac)}
+.row-info{flex:1;min-width:0}
+.row-nm{font-weight:500;font-size:13px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.row-pt{font-size:10px;color:var(--t3);font-family:'SF Mono',Monaco,monospace;word-break:break-all;margin:1px 0}
+.row-ds{font-size:11px;color:var(--t2)}
+.row-sz{flex-shrink:0;text-align:right;min-width:68px}
+.row-sz .sv{font-size:14px;font-weight:600}
+.row-act{flex-shrink:0;display:flex;gap:5px;align-items:flex-start;flex-wrap:wrap}
+
+/* Badges */
+.bg{font-size:9px;padding:1px 6px;border-radius:8px;font-weight:500;white-space:nowrap}
+.bg-s{background:rgba(63,185,80,.14);color:var(--gn)}
+.bg-m{background:rgba(210,153,34,.14);color:var(--yw)}
+.bg-c{background:rgba(248,81,73,.14);color:var(--rd)}
+.bg-u{background:rgba(139,148,158,.14);color:var(--t2)}
+.bg-d{background:rgba(63,185,80,.14);color:var(--gn)}
+.bg-dir{background:rgba(188,140,255,.12);color:var(--pp)}
+
+/* Drill */
+.drill{background:var(--bg);border-top:1px solid var(--bd)}
+.drill-hd{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;background:var(--s2);font-size:12px}
+.drill-hd .bc{display:flex;align-items:center;gap:3px;flex-wrap:wrap}
+.drill-hd .bc span{color:var(--t2)} .drill-hd .bc a{color:var(--ac);cursor:pointer;text-decoration:none;font-weight:500}
+.drill-hd .bc a:hover{text-decoration:underline}
+.drill-list{max-height:400px;overflow-y:auto}
+
+.crow{display:flex;align-items:center;padding:7px 16px 7px 28px;gap:8px;border-bottom:1px solid rgba(48,54,61,.5);font-size:12px;transition:background .1s}
+.crow:hover{background:rgba(255,255,255,.02)} .crow:last-child{border-bottom:none}
+.crow.done{opacity:.5;text-decoration:line-through;transition:opacity .4s,max-height .4s;max-height:100px;overflow:hidden}
+.crow.fade-out{opacity:0;max-height:0;padding:0;margin:0;border:none}
+.crow-chk{flex-shrink:0} .crow-chk input{width:14px;height:14px;accent-color:var(--ac);cursor:pointer}
+.crow-ic{font-size:14px;flex-shrink:0;width:18px;text-align:center}
+.crow-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.crow-nm.lnk{cursor:pointer;color:var(--ac)} .crow-nm.lnk:hover{text-decoration:underline}
+.crow-cnt{font-size:10px;color:var(--t3);flex-shrink:0}
+.sbar-bg{width:70px;height:5px;background:var(--s2);border-radius:3px;flex-shrink:0;overflow:hidden}
+.sbar-fl{height:100%;border-radius:3px}
+.crow-sz{flex-shrink:0;min-width:65px;text-align:right;font-weight:600;font-size:12px}
+.crow-act{flex-shrink:0}
+.crow-ds{font-size:10px;color:var(--t2);margin-left:26px;margin-top:-2px;margin-bottom:4px;padding:0 16px 0 0}
+
+/* Loading */
+.ld{text-align:center;padding:70px 0}
+.spin{width:36px;height:36px;border:3px solid var(--bd);border-top-color:var(--ac);border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 12px}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Modal */
+.mbg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;justify-content:center;align-items:center}
+.mbg.on{display:flex}
+.mdl{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:22px;max-width:440px;width:90%}
+.mdl h3{margin-bottom:8px;font-size:16px} .mdl p{color:var(--t2);margin-bottom:16px;font-size:12px;line-height:1.6}
+.mdl-a{display:flex;gap:8px;justify-content:flex-end}
+
+/* Toast */
+.toast{position:fixed;bottom:18px;right:18px;background:var(--s1);border:1px solid var(--gn);color:var(--t1);padding:10px 16px;border-radius:10px;font-size:12px;z-index:200;animation:su .3s;max-width:320px}
+.toast.err{border-color:var(--rd)}
+@keyframes su{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* Selection bar */
+.sbar{position:fixed;bottom:0;left:0;right:0;background:var(--s1);border-top:1px solid var(--bd);padding:10px 20px;display:none;justify-content:space-between;align-items:center;z-index:50}
+.sbar.vis{display:flex}
+.sbar .inf{font-size:12px} .sbar .inf strong{color:var(--ac)}
+.sbar .acts{display:flex;gap:6px}
+
+/* Status bar */
+.status{background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:8px 14px;margin-bottom:16px;font-size:11px;color:var(--t2);display:flex;align-items:center;flex-wrap:wrap}
+
+.ftr{text-align:center;padding:24px 0;color:var(--t3);font-size:11px}
+@media(max-width:640px){.sum{grid-template-columns:1fr}.wrap{padding:14px 14px 100px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hdr">
+    <h1>macOS System Cleaner</h1>
+    <p>v3.1 · 자동 스캔 · 용량 큰 폴더 자동 탐색 · 드릴다운</p>
+  </div>
+  <div class="status" id="statusBar">&#x1F7E1; 시작 중...</div>
+  <div id="app">
+    <div class="ld"><div class="spin"></div>
+    <p>시스템을 스캔하고 있습니다...</p>
+    <p style="color:var(--t3);font-size:11px;margin-top:5px">큰 폴더를 자동으로 찾는 중 — 잠시 걸릴 수 있습니다</p>
+    </div>
+  </div>
+</div>
+
+<!-- Delete modal -->
+<div class="mbg" id="delModal"><div class="mdl">
+  <h3>선택 항목 삭제</h3><p id="delBody"></p>
+  <div class="mdl-a"><button class="btn btn-o" onclick="closeModal()">취소</button><button class="btn btn-d" onclick="confirmBulk()">삭제</button></div>
+</div></div>
+
+<!-- sudo single modal -->
+<div class="mbg" id="sudoM"><div class="mdl">
+  <h3 style="color:var(--yw)">&#x1F512; 관리자 권한 필요</h3><p id="sudoBody"></p>
+  <div class="mdl-a"><button class="btn btn-o" onclick="closeSudo()">취소</button><button class="btn btn-a" onclick="doSudo()">sudo로 삭제</button></div>
+</div></div>
+
+<!-- sudo bulk modal -->
+<div class="mbg" id="sudoBM"><div class="mdl">
+  <h3 style="color:var(--yw)">&#x1F512; 일부 항목 권한 부족</h3><p id="sudoBBody"></p>
+  <div class="mdl-a"><button class="btn btn-o" onclick="closeSudoB()">건너뛰기</button><button class="btn btn-a" onclick="doSudoB()">sudo로 재시도</button></div>
+</div></div>
+
+<!-- Selection bar -->
+<div class="sbar" id="selBar">
+  <div class="inf"><strong id="selCnt">0</strong>개 선택 · <strong id="selSz">0</strong> 확보 예상</div>
+  <div class="acts">
+    <button class="btn btn-o btn-sm" onclick="clearSel()">해제</button>
+    <button class="btn btn-d btn-sm" onclick="showBulkModal()">선택 삭제</button>
+  </div>
+</div>
+
+<script>
+let D=null, sel=new Set(), del_=new Set(), drills={};
+let totalFreed=0, scanTime=null, serverOk=false;
+let drillSeq=0;
+
+window.addEventListener('DOMContentLoaded', ()=>{ doScan(); setInterval(heartbeat,5000); });
+
+let scanning=false;
+async function doScan(){
+  if(scanning)return;
+  scanning=true;
+  document.getElementById('app').innerHTML='<div class="ld"><div class="spin"></div><p>시스템을 스캔하고 있습니다...</p><p style="color:var(--t3);font-size:11px;margin-top:5px">큰 폴더를 자동으로 찾는 중 — 잠시 걸릴 수 있습니다</p></div>';
+  try{
+    const r=await fetch('/api/scan'); D=await r.json(); del_.clear(); totalFreed=0;
+    serverOk=true; scanTime=new Date();
+    const drillKeys=Object.keys(drills);
+    if(drillKeys.length>0){
+      await Promise.all(drillKeys.map(async key=>{
+        const dr=drills[key];if(!dr)return;
+        try{
+          const cr=await fetch('/api/children?path='+encodeURIComponent(dr.path));
+          const cd=await cr.json(); dr.children=cd.children||[];
+        }catch(e){ dr.children=[]; }
+      }));
+    }
+    render();
+  }catch(e){
+    serverOk=false; updStatus();
+    document.getElementById('app').innerHTML='<div class="ld" style="color:var(--rd)">오류: '+e.message+'<br><button class="btn btn-a" style="margin-top:10px" onclick="doScan()">다시 시도</button></div>';
+  }finally{ scanning=false; }
+}
+
+async function heartbeat(){
+  try{ const r=await fetch('/api/scan',{method:'HEAD'}); serverOk=r.ok; }
+  catch(e){ serverOk=false; }
+  updStatus();
+}
+function updStatus(){
+  const el=document.getElementById('statusBar');
+  if(!el)return;
+  const dot=serverOk?'&#x1F7E2;':'&#x1F534;';
+  const stxt=serverOk?'서버 연결됨':'서버 연결 끊김';
+  const ttxt=scanTime?timeAgo(scanTime):'—';
+  const ftxt=totalFreed>0?'<span style="color:var(--gn);margin-left:12px">&#x2705; '+fmtB(totalFreed)+' 확보됨</span>':'';
+  const dtxt=del_.size>0?'<span style="margin-left:12px">'+del_.size+'개 삭제됨</span>':'';
+  el.innerHTML=`<span>${dot} ${stxt}</span><span style="margin-left:12px">스캔: ${ttxt}</span>${dtxt}${ftxt}`;
+}
+function timeAgo(d){
+  const s=Math.floor((Date.now()-d.getTime())/1000);
+  if(s<5)return '방금 전';if(s<60)return s+'초 전';
+  const m=Math.floor(s/60);if(m<60)return m+'분 전';
+  return Math.floor(m/60)+'시간 전';
+}
+
+// ── Drill (병렬 처리) ──
+async function drillInto(path,key){
+  const reqId=++drillSeq;
+  drills[key]={path,children:[],loading:true,hist:[path],reqId};render();
+  try{
+    const r=await fetch('/api/children?path='+encodeURIComponent(path));
+    const d=await r.json();
+    if(!drills[key]||drills[key].reqId!==reqId)return;
+    drills[key].children=d.children||[];drills[key].loading=false;
+  }catch(e){
+    if(!drills[key]||drills[key].reqId!==reqId)return;
+    drills[key].loading=false;
+  }
+  render();
+}
+async function drillDeep(sub,key){
+  const dr=drills[key];if(!dr)return;
+  const reqId=++drillSeq;
+  dr.hist.push(sub);dr.path=sub;dr.loading=true;dr.children=[];dr.reqId=reqId;render();
+  try{
+    const r=await fetch('/api/children?path='+encodeURIComponent(sub));
+    const d=await r.json();
+    if(!drills[key]||drills[key].reqId!==reqId)return;
+    dr.children=d.children||[];dr.loading=false;
+  }catch(e){
+    if(!drills[key]||drills[key].reqId!==reqId)return;
+    dr.loading=false;
+  }
+  render();
+}
+async function drillBack(key,idx){
+  const dr=drills[key];if(!dr)return;
+  const reqId=++drillSeq;
+  dr.hist=dr.hist.slice(0,idx+1);dr.path=dr.hist[dr.hist.length-1];dr.loading=true;dr.children=[];dr.reqId=reqId;render();
+  try{
+    const r=await fetch('/api/children?path='+encodeURIComponent(dr.path));
+    const d=await r.json();
+    if(!drills[key]||drills[key].reqId!==reqId)return;
+    dr.children=d.children||[];dr.loading=false;
+  }catch(e){
+    if(!drills[key]||drills[key].reqId!==reqId)return;
+    dr.loading=false;
+  }
+  render();
+}
+function closeDrill(key){delete drills[key];sel.forEach(s=>{if(s.startsWith('c::'+key))sel.delete(s);});render();}
+
+// ── Selection ──
+function tog(k){sel.has(k)?sel.delete(k):sel.add(k);render();}
+function selSafe(){D.groups.forEach((g,gi)=>g.items.forEach((it,ii)=>{if(it.risk==='safe'&&!del_.has(it.path))sel.add(gi+'-'+ii);}));render();}
+function selAll(){D.groups.forEach((g,gi)=>g.items.forEach((it,ii)=>{if(!del_.has(it.path))sel.add(gi+'-'+ii);}));render();}
+function clearSel(){sel.clear();render();}
+function selAllChildren(key){const dr=drills[key];if(!dr)return;dr.children.forEach(ch=>{if(ch.path&&!del_.has(ch.path))sel.add('c::'+key+'::'+ch.path);});render();}
+
+// ── Lookup (모르는 폴더 검색 — 패턴 매칭 + 웹 검색) ──
+let lookingUp=false;
+async function lookupAll(){
+  if(lookingUp)return;
+  lookingUp=true;
+  // unknown 항목 수집
+  const unknowns=[];
+  D.groups.forEach(g=>g.items.forEach(it=>{
+    if(it.risk==='unknown'&&!del_.has(it.path)) unknowns.push({name:it.name,path:it.path});
+  }));
+  if(!unknowns.length){toast('모르는 폴더가 없습니다.');lookingUp=false;return;}
+
+  toast(unknowns.length+'개 폴더 검색 시작...');
+  let found=0;
+  // 병렬로 최대 4개씩 검색
+  for(let i=0;i<unknowns.length;i+=4){
+    const batch=unknowns.slice(i,i+4);
+    const results=await Promise.all(batch.map(async u=>{
+      try{
+        const r=await fetch('/api/lookup?name='+encodeURIComponent(u.name)+'&path='+encodeURIComponent(u.path));
+        return {item:u, result:await r.json()};
+      }catch(e){return {item:u, result:null};}
+    }));
+    results.forEach(({item,result})=>{
+      if(result&&result.desc&&result.desc!=='정보 없음'){
+        applyLookup(item.path,result.desc,result.risk,result.source);
+        found++;
+      }
+    });
+    render(); // 배치마다 화면 갱신
+  }
+  toast(found+'/'+unknowns.length+'개 폴더 정보 발견'+(found<unknowns.length?' (일부 미발견)':''));
+  lookingUp=false;
+}
+async function lookupOne(name,path){
+  toast('검색 중: '+name);
+  try{
+    const r=await fetch('/api/lookup?name='+encodeURIComponent(name)+'&path='+encodeURIComponent(path));
+    const res=await r.json();
+    if(res.desc&&res.desc!=='정보 없음'){
+      applyLookup(path,res.desc,res.risk,res.source);
+      toast('검색 완료: '+name);
+    }else{toast('정보 없음: '+name,true);}
+    render();
+  }catch(e){toast('검색 오류: '+e.message,true);}
+}
+function applyLookup(path,desc,risk,source){
+  for(const g of D.groups) for(const it of g.items){
+    if(it.path===path){it.description=desc;it.risk=risk;it._source=source;return;}
+  }
+  for(const dk in drills){
+    const ch=drills[dk].children.find(c=>c.path===path);
+    if(ch){ch.description=desc;ch.risk=risk;ch._source=source;return;}
+  }
+}
+
+// ── Delete ──
+async function delOne(path,recreate,sudo=false){
+  if(!sudo&&!confirm('삭제할까요?\n'+path))return;
+  try{
+    const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,recreate,use_sudo:sudo})});
+    const res=await r.json();
+    if(res.success){
+      del_.add(path);
+      const info=findItemByPath(path);
+      if(info) totalFreed+=info.size;
+      toast(sudo?'sudo 삭제 완료':'삭제 완료');
+      render();
+    }
+    else if(res.code==='permission_denied'){showSudo(path,recreate);}
+    else toast('실패: '+res.message,true);
+  }catch(e){toast('오류: '+e.message,true);}
+}
+function findItemByPath(path){
+  for(const g of D.groups) for(const it of g.items) if(it.path===path) return it;
+  for(const dk in drills){ const ch=drills[dk].children.find(c=>c.path===path); if(ch) return ch; }
+  return null;
+}
+function showSudo(path,recreate){
+  document.getElementById('sudoBody').innerHTML='<strong>'+path.split('/').pop()+'</strong> 삭제 권한 부족<br><br>sudo로 다시 시도하면 macOS 비밀번호 창이 표시됩니다.<br><span style="font-size:10px;color:var(--t3)">'+path+'</span>';
+  const m=document.getElementById('sudoM');m.dataset.path=path;m.dataset.recreate=recreate;m.classList.add('on');
+}
+function closeSudo(){document.getElementById('sudoM').classList.remove('on');}
+async function doSudo(){const m=document.getElementById('sudoM');closeSudo();toast('sudo 시도 중...');await delOne(m.dataset.path,m.dataset.recreate==='true',true);}
+
+function showBulkModal(){
+  if(!sel.size)return;
+  let t=0,cc=0,n=0;sel.forEach(k=>{const i=resolv(k);if(i){t+=i.size;n++;if(i.risk==='caution')cc++;}});
+  let h=n+'개 항목 ('+fmtB(t)+') 삭제';if(cc)h+='<br><br><span style="color:var(--rd)">주의 항목 '+cc+'개 포함</span>';
+  h+='<br><br>계속할까요?';document.getElementById('delBody').innerHTML=h;document.getElementById('delModal').classList.add('on');
+}
+function closeModal(){document.getElementById('delModal').classList.remove('on');}
+
+async function confirmBulk(){
+  closeModal();const items=[];sel.forEach(k=>{const i=resolv(k);if(i)items.push(i);});
+  let ok=0,freed=0,pf=[];
+  for(const it of items){try{
+    const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,recreate:it.recreate||false})});
+    const res=await r.json();
+    if(res.success){del_.add(it.path);ok++;freed+=it.size;}
+    else if(res.code==='permission_denied')pf.push(it);
+  }catch(e){}}
+  sel.clear();if(ok>0){toast(ok+'개 삭제 ('+fmtB(freed)+' 확보)');totalFreed+=freed;}
+  if(pf.length>0){
+    document.getElementById('sudoBBody').innerHTML='<strong>'+pf.length+'개</strong> 권한 부족<br><span style="font-size:10px;color:var(--t3)">'+pf.map(f=>f.path.split('/').pop()).join(', ')+'</span><br><br>sudo로 재시도?';
+    window._spf=pf;document.getElementById('sudoBM').classList.add('on');
+  }
+  render();
+}
+function closeSudoB(){document.getElementById('sudoBM').classList.remove('on');}
+async function doSudoB(){closeSudoB();const items=window._spf||[];toast('sudo 시도 중...');let ok=0,freed=0;
+  for(const it of items){try{const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,recreate:it.recreate||false,use_sudo:true})});const res=await r.json();if(res.success){del_.add(it.path);ok++;freed+=it.size;}}catch(e){}}
+  if(ok>0){toast(ok+'개 sudo 삭제 ('+fmtB(freed)+')');totalFreed+=freed;}render();
+}
+
+function resolv(key){
+  if(key.startsWith('c::')){const parts=key.split('::');const p=parts.slice(2).join('::');for(const dk in drills){const ch=drills[dk].children.find(c=>c.path===p);if(ch)return{path:ch.path,size:ch.size,risk:ch.risk||'unknown',recreate:false};}return{path:p,size:0,risk:'unknown',recreate:false};}
+  const[gi,ii]=key.split('-').map(Number);const it=D.groups[gi].items[ii];return{path:it.path,size:it.size,risk:it.risk,recreate:false};
+}
+
+// ── Utils ──
+function fmtB(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';if(b<1073741824)return(b/1048576).toFixed(1)+' MB';return(b/1073741824).toFixed(2)+' GB';}
+function toast(m,e){const t=document.createElement('div');t.className='toast'+(e?' err':'');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),3500);}
+function szC(b){return b>1073741824?'var(--rd)':b>104857600?'var(--yw)':'var(--t1)';}
+function pct(a,b){return b>0?Math.min(100,a/b*100):0;}
+function riskBg(r){return r==='safe'?'bg-s':r==='moderate'?'bg-m':r==='caution'?'bg-c':'bg-u';}
+function riskTxt(r){return r==='safe'?'안전':r==='moderate'?'주의':r==='caution'?'위험':'—';}
+
+// ── Render ──
+function render(){
+  if(!D||!D.groups.length){document.getElementById('app').innerHTML='<div class="ld" style="padding:50px"><p style="font-size:16px">정리할 큰 폴더가 없습니다!</p></div>';return;}
+  const di=D.disk_info;
+  const pctN=di.percent?parseInt(di.percent):0;
+  const bc=pctN>90?'var(--rd)':pctN>70?'var(--yw)':'var(--gn)';
+  let safeS=0,unknownCnt=0;
+  D.groups.forEach(g=>g.items.forEach(i=>{if(i.risk==='safe')safeS+=i.size;if(i.risk==='unknown')unknownCnt++;}));
+
+  let h=`<div class="dsk"><div class="dsk-top"><strong>디스크 사용량</strong><span style="color:var(--t2)">${di.percent} 사용 중</span></div>
+    <div class="dsk-bar"><div class="dsk-fill" style="width:${pctN}%;background:${bc}"></div></div>
+    <div class="dsk-row"><span>사용 <strong>${di.used}</strong></span><span>여유 <strong>${di.available}</strong></span><span>전체 <strong>${di.total}</strong></span></div></div>
+  <div class="sum">
+    <div class="sc"><div class="l">발견된 큰 폴더</div><div class="v v-r">${D.total_cleanable_formatted}</div></div>
+    <div class="sc"><div class="l">안전 삭제 가능</div><div class="v v-g">${fmtB(safeS)}</div></div>
+    <div class="sc"><div class="l">TM 스냅샷</div><div class="v v-y">${D.tm_snapshots}개</div></div>
+  </div>`;
+
+  if(unknownCnt>0) h+=`<div class="tm" style="cursor:pointer;border-color:var(--ac)" onclick="lookupAll()"><span style="font-size:18px">&#x1F50D;</span><div><strong>모르는 폴더 ${unknownCnt}개</strong> — 클릭하면 자동으로 검색합니다<br><span style="color:var(--t3);font-size:10px">패턴 매칭 + 웹 검색 · 결과는 캐시에 저장됨</span></div></div>`;
+
+  if(D.tm_snapshots>0) h+=`<div class="tm"><span style="font-size:18px">&#x23F1;</span><div><strong>Time Machine 스냅샷 ${D.tm_snapshots}개</strong><br><span style="color:var(--t2)"><code>sudo tmutil thinlocalsnapshots / 99999999999999 1</code></span></div></div>`;
+
+  h+=`<div class="abar"><div class="left">
+    <button class="btn btn-o btn-sm" onclick="selSafe()">안전 항목 선택</button>
+    <button class="btn btn-o btn-sm" onclick="selAll()">전체 선택</button>
+    <button class="btn btn-o btn-sm" onclick="clearSel()">해제</button>
+  </div><button class="btn btn-a btn-sm" onclick="doScan()">다시 스캔</button></div>`;
+
+  D.groups.forEach((g,gi)=>{
+    h+=`<div class="grp"><div class="grp-head" onclick="togGrp(${gi})">
+      <div class="grp-title">&#x1F4C2; ${g.label} <span style="font-size:11px;color:var(--t3)">(${g.items.length})</span></div>
+      <div class="grp-size">${g.total_size_formatted}</div></div>
+      <div class="grp-body" id="gb-${gi}">`;
+
+    g.items.forEach((it,ii)=>{
+      const ik=gi+'-'+ii, isSel=sel.has(ik), isDel=del_.has(it.path);
+      h+=`<div class="row ${isSel?'sel':''} ${isDel?'done':''}" id="r-${ik}">
+        <div class="row-chk">${isDel?'':`<input type="checkbox" ${isSel?'checked':''} onchange="tog('${ik}')" />`}</div>
+        <div class="row-info">
+          <div class="row-nm">${it.name}
+            ${it.risk!=='unknown'?`<span class="bg ${riskBg(it.risk)}">${riskTxt(it.risk)}</span>`:''}
+            ${it.risk==='unknown'&&!isDel?`<span class="bg bg-u" style="cursor:pointer" onclick="event.stopPropagation();lookupOne('${esc(it.name)}','${esc(it.path)}')">? 검색</span>`:''}
+            ${isDel?'<span class="bg bg-d">삭제됨</span>':''}
+            ${it.drillable&&!isDel?'<span class="bg bg-dir">'+it.children_count+'개 하위</span>':''}
+            ${it._source==='web'?'<span class="bg" style="background:rgba(88,166,255,.12);color:var(--ac)">웹</span>':''}
+            ${it._source==='pattern'?'<span class="bg" style="background:rgba(188,140,255,.12);color:var(--pp)">패턴</span>':''}
+          </div>
+          <div class="row-pt">${it.path}</div>
+          ${it.description?'<div class="row-ds">'+it.description+'</div>':''}
+        </div>
+        <div class="row-sz"><div class="sv" style="color:${szC(it.size)}">${isDel?'<s>'+it.size_formatted+'</s>':it.size_formatted}</div></div>
+        <div class="row-act">
+          ${it.drillable&&!isDel?`<button class="btn btn-o btn-sm" onclick="event.stopPropagation();${drills[ik]?`closeDrill('${ik}')`:`drillInto('${esc(it.path)}','${ik}')`}">${drills[ik]?'접기':'펼치기'}</button>`:''}
+          ${isDel?'':`<button class="btn btn-o btn-sm" onclick="event.stopPropagation();delOne('${esc(it.path)}',false)">삭제</button>`}
+        </div></div>`;
+
+      if(drills[ik]){
+        const dr=drills[ik];
+        h+=`<div class="drill"><div class="drill-hd"><div class="bc">`;
+        dr.hist.forEach((hp,hi)=>{const lb=hi===0?it.name:hp.split('/').pop();
+          h+=hi<dr.hist.length-1?`<a onclick="drillBack('${ik}',${hi})">${lb}</a><span>/</span>`:`<strong>${lb}</strong>`;});
+        h+=`</div><div style="display:flex;gap:4px"><button class="btn btn-o btn-sm" onclick="selAllChildren('${ik}')">전체 선택</button><button class="btn btn-o btn-sm" onclick="closeDrill('${ik}')">닫기</button></div></div>`;
+
+        if(dr.loading){h+=`<div style="padding:16px;text-align:center;color:var(--t2);font-size:12px"><div class="spin" style="width:20px;height:20px;margin:0 auto 6px;border-width:2px"></div>분석 중...</div>`;}
+        else if(!dr.children.length){h+=`<div style="padding:12px;text-align:center;color:var(--t3);font-size:12px">하위 항목 없음</div>`;}
+        else{
+          const mx=Math.max(...dr.children.map(c=>c.size));
+          h+=`<div class="drill-list">`;
+          dr.children.forEach(ch=>{
+            const ck='c::'+ik+'::'+ch.path, cSel=sel.has(ck), cDel=del_.has(ch.path);
+            const bp=pct(ch.size,mx), bclr=ch.size>524288000?'var(--rd)':ch.size>52428800?'var(--yw)':'var(--ac)';
+            h+=`<div class="crow ${cDel?'done':''}">
+              <div class="crow-chk">${cDel||!ch.path?'':`<input type="checkbox" ${cSel?'checked':''} onchange="tog('${esc(ck)}')" />`}</div>
+              <div class="crow-ic">${ch.is_dir?'&#x1F4C1;':'&#x1F4C4;'}</div>
+              <div class="crow-nm ${ch.is_dir&&ch.children_count>0&&!cDel?'lnk':''}"
+                ${ch.is_dir&&ch.children_count>0&&!cDel?`onclick="drillDeep('${esc(ch.path)}','${ik}')"`:''}
+                title="${ch.path}">${ch.name}${cDel?' <span class="bg bg-d">삭제됨</span>':''}
+                ${ch.risk&&ch.risk!=='unknown'?` <span class="bg ${riskBg(ch.risk)}">${riskTxt(ch.risk)}</span>`:''}
+              </div>
+              ${ch.is_dir&&ch.children_count>0?`<div class="crow-cnt">${ch.children_count}개</div>`:'<div class="crow-cnt"></div>'}
+              <div class="sbar-bg"><div class="sbar-fl" style="width:${bp}%;background:${bclr}"></div></div>
+              <div class="crow-sz" style="color:${szC(ch.size)}">${ch.size_formatted}</div>
+              <div class="crow-act">${ch.path&&!cDel?`<button class="btn btn-o btn-sm" onclick="delOne('${esc(ch.path)}',false)">삭제</button>`:''}</div>
+            </div>`;
+            if(ch.description) h+=`<div class="crow-ds">${ch.description}</div>`;
+          });
+          h+=`</div>`;
+        }
+        h+=`</div>`;
+      }
+    });
+    h+=`</div></div>`;
+  });
+
+  h+=`<div class="ftr">macOS System Cleaner v3.1 · 자동 스캔 · 삭제 전 백업 권장</div>`;
+  document.getElementById('app').innerHTML=h;
+  updBar(); updStatus();
+}
+function esc(s){return s.replace(/'/g,"\\'");}
+function togGrp(gi){const el=document.getElementById('gb-'+gi);el.style.display=el.style.display==='none'?'block':'none';}
+function updBar(){
+  const bar=document.getElementById('selBar');
+  if(!sel.size){bar.classList.remove('vis');return;}
+  let t=0;sel.forEach(k=>{const i=resolv(k);if(i)t+=i.size;});
+  document.getElementById('selCnt').textContent=sel.size;
+  document.getElementById('selSz').textContent=fmtB(t);
+  bar.classList.add('vis');
+}
+</script>
+</body>
+</html>
