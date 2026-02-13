@@ -11,7 +11,7 @@ import urllib.request
 import urllib.error
 import zipfile
 from .config import VERSION, GITHUB_REPO, LEARNED_PATH
-from .lookup import _load_json, _save_json
+from .lookup import _load_json, _save_json, _file_lock
 
 
 # GitHub API / Raw 경로
@@ -301,16 +301,16 @@ def _merge_remote_db():
         remote_data = json.loads(resp.read().decode("utf-8"))
 
     remote_data.pop("_comment", None)
-    local_data = _load_json(LEARNED_PATH)
 
-    new_count = 0
-    for key, val in remote_data.items():
-        if key not in local_data:
-            local_data[key] = val
-            new_count += 1
-
-    if new_count > 0:
-        _save_json(LEARNED_PATH, local_data)
+    with _file_lock:
+        local_data = _load_json(LEARNED_PATH)
+        new_count = 0
+        for key, val in remote_data.items():
+            if key not in local_data:
+                local_data[key] = val
+                new_count += 1
+        if new_count > 0:
+            _save_json(LEARNED_PATH, local_data)
 
     return new_count
 

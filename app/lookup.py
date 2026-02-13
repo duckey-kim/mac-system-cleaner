@@ -4,6 +4,8 @@ import json
 import os
 import re
 import sys
+import tempfile
+import threading
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -188,16 +190,29 @@ def _load_json(path):
     return {}
 
 
+_file_lock = threading.Lock()
+
+
 def _save_json(path, data):
-    """JSON 파일 저장 (키별 한 줄 compact 형식)"""
+    """JSON 파일 저장 (키별 한 줄 compact 형식, atomic write)"""
     try:
         lines = []
         for key, val in data.items():
             lines.append(f'"{key}":{json.dumps(val, ensure_ascii=False, separators=(",", ":"))}')
-        with open(path, "w", encoding="utf-8") as f:
-            f.write("{\n" + ",\n".join(lines) + "\n}\n")
+        content = "{\n" + ",\n".join(lines) + "\n}\n"
+        dir_name = os.path.dirname(path)
+        with tempfile.NamedTemporaryFile(
+            mode="w", dir=dir_name, suffix=".tmp",
+            delete=False, encoding="utf-8"
+        ) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        os.replace(tmp_path, path)
     except Exception:
-        pass
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 
 def _load_learned():
@@ -228,49 +243,53 @@ def lookup_folder(name, path=""):
 
     cache_key = name.lower()
 
-    # 0단계: 영구 저장소 확인 (프로젝트 안, 캐시 지워도 살아있음)
-    learned = _load_learned()
-    if cache_key in learned:
-        entry = learned[cache_key]
-        return {
-            "desc": entry["desc"],
-            "risk": entry["risk"],
-            "source": entry.get("source", "learned"),
-        }
+    with _file_lock:
+        # 0단계: 영구 저장소 확인 (프로젝트 안, 캐시 지워도 살아있음)
+        learned = _load_learned()
+        if cache_key in learned:
+            entry = learned[cache_key]
+            return {
+                "desc": entry["desc"],
+                "risk": entry["risk"],
+                "source": entry.get("source", "learned"),
+            }
 
-    # 0.5단계: 임시 캐시 확인 (빠른 조회)
-    cache = _load_cache()
-    if cache_key in cache:
-        entry = cache[cache_key]
-        return {
-            "desc": entry["desc"],
-            "risk": entry["risk"],
-            "source": entry.get("source", "cache"),
-        }
+        # 0.5단계: 임시 캐시 확인 (빠른 조회)
+        cache = _load_cache()
+        if cache_key in cache:
+            entry = cache[cache_key]
+            return {
+                "desc": entry["desc"],
+                "risk": entry["risk"],
+                "source": entry.get("source", "cache"),
+            }
 
-    # 1단계: 패턴 매칭
-    desc, risk = pattern_match(name, path)
-    if desc:
-        result = {"desc": desc, "risk": risk, "source": "pattern"}
-        # 패턴 결과 → 영구 저장 + 캐시
-        learned[cache_key] = result
-        _save_learned(learned)
-        cache[cache_key] = result
-        _save_cache(cache)
-        return result
+        # 1단계: 패턴 매칭
+        desc, risk = pattern_match(name, path)
+        if desc:
+            result = {"desc": desc, "risk": risk, "source": "pattern"}
+            learned[cache_key] = result
+            _save_learned(learned)
+            cache[cache_key] = result
+            _save_cache(cache)
+            return result
 
-    # 2단계: 웹 검색
+    # 2단계: 웹 검색 (lock 밖에서 — 네트워크 I/O는 오래 걸림)
     desc, risk = web_search(name, path)
     if desc:
         result = {"desc": desc, "risk": risk, "source": "web"}
-        # 웹 검색 결과 → 영구 저장 + 캐시
-        learned[cache_key] = result
-        _save_learned(learned)
-        cache[cache_key] = result
-        _save_cache(cache)
+        with _file_lock:
+            learned = _load_learned()
+            learned[cache_key] = result
+            _save_learned(learned)
+            cache = _load_cache()
+            cache[cache_key] = result
+            _save_cache(cache)
         return result
 
-    # 못 찾음 — 캐시에만 저장 (영구 저장소에 "정보 없음"은 안 넣음)
-    cache[cache_key] = {"desc": "정보 없음", "risk": "unknown", "source": "none"}
-    _save_cache(cache)
+    # 못 찾음 — 캐시에만 저장
+    with _file_lock:
+        cache = _load_cache()
+        cache[cache_key] = {"desc": "정보 없음", "risk": "unknown", "source": "none"}
+        _save_cache(cache)
     return {"desc": "정보 없음", "risk": "unknown", "source": "none"}
