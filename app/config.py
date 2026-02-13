@@ -2,11 +2,41 @@
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
-VERSION = "3.2"
 GITHUB_REPO = "duckey-kim/mac-system-cleaner"
+
+
+def _get_version():
+    """git tag에서 버전 추출 (PyInstaller 번들에서는 VERSION 파일 사용)"""
+    # 1) PyInstaller 번들: 빌드 시 생성된 VERSION 파일
+    if getattr(sys, "frozen", False):
+        ver_file = os.path.join(sys._MEIPASS, "VERSION")
+        try:
+            with open(ver_file, "r") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+
+    # 2) 개발 환경: git describe --tags
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            capture_output=True, text=True, timeout=5,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        if result.returncode == 0:
+            tag = result.stdout.strip()
+            return tag.lstrip("v")  # "v3.2" -> "3.2"
+    except Exception:
+        pass
+
+    return "dev"
+
+
+VERSION = _get_version()
 
 PORT = 8787
 HOME = str(Path.home())
