@@ -6,6 +6,16 @@ import subprocess
 
 from .config import HOME, get_folder_info
 
+# ============================================================
+# 스캔 임계값 상수
+# ============================================================
+MIN_GROUP_MB = 50       # depth-1 그룹 최소 크기
+MIN_ITEM_MB = 20        # depth-2 항목 최소 크기
+MIN_CHILD_BYTES = 512 * 1024   # drill-down 항목 최소 크기 (512KB)
+MAX_ITEMS_PER_GROUP = 20       # 그룹당 최대 항목 수
+MAX_CHILDREN = 30              # drill-down 최대 항목 수
+DU_TIMEOUT = 120               # du 명령 타임아웃 (초)
+
 
 def format_size(size_bytes):
     """바이트를 사람 읽기 형태로"""
@@ -42,7 +52,7 @@ def get_children_sizes(parent_path):
             ["du", "-d1", "-k", parent_path],
             capture_output=True, text=True, timeout=60
         )
-        if result.returncode in (0, 1):
+        if result.returncode in (0, 1):  # 1 = 일부 경로 권한 오류 (무시 가능)
             return _parse_du(result.stdout, parent_path)
     except Exception:
         pass
@@ -104,17 +114,17 @@ def _make_item(path, name, size):
 def scan_system():
     """시스템 자동 스캔 — du -d2 한 번으로 ~/Library 전체 탐색 (하드코딩 없음)"""
     library_path = os.path.join(HOME, "Library")
-    min_group_bytes = 50 * 1024 * 1024   # depth-1 그룹: 50MB
-    min_item_bytes = 20 * 1024 * 1024    # depth-2 항목: 20MB
+    min_group_bytes = MIN_GROUP_MB * 1024 * 1024
+    min_item_bytes = MIN_ITEM_MB * 1024 * 1024
 
     # ---- 1) du -d2 단일 호출로 전체 크기 수집 ----
     all_sizes = {}
     try:
         result = subprocess.run(
             ["du", "-d2", "-k", library_path],
-            capture_output=True, text=True, timeout=120
+            capture_output=True, text=True, timeout=DU_TIMEOUT
         )
-        if result.returncode in (0, 1):
+        if result.returncode in (0, 1):  # 1 = 일부 경로 권한 오류 (무시 가능)
             all_sizes = _parse_du(result.stdout, library_path)
     except Exception:
         pass
@@ -164,7 +174,7 @@ def scan_system():
             groups.append({
                 "label": f"Library/{folder_name}",
                 "path": d1_path,
-                "items": items[:20],
+                "items": items[:MAX_ITEMS_PER_GROUP],
                 "total_size": total_size,
                 "total_size_formatted": format_size(total_size),
             })
@@ -221,7 +231,7 @@ def scan_children(parent_path):
                     size = os.path.getsize(full_path)
                 except OSError:
                     continue
-            if size < 512 * 1024:
+            if size < MIN_CHILD_BYTES:
                 continue
             children_count = 0
             if is_dir:
@@ -245,10 +255,10 @@ def scan_children(parent_path):
 
     children.sort(key=lambda x: x["size"], reverse=True)
 
-    if len(children) > 30:
-        rest_size = sum(c["size"] for c in children[30:])
-        rest_count = len(children) - 30
-        children = children[:30]
+    if len(children) > MAX_CHILDREN:
+        rest_size = sum(c["size"] for c in children[MAX_CHILDREN:])
+        rest_count = len(children) - MAX_CHILDREN
+        children = children[:MAX_CHILDREN]
         children.append({
             "name": f"(기타 {rest_count}개 항목)",
             "path": "", "size": rest_size, "size_formatted": format_size(rest_size),

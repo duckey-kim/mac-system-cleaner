@@ -56,3 +56,14 @@ def get_folder_info(name):
     if info:
         return info["desc"], info["risk"]
     return "", "unknown"
+
+
+# ============================================================
+# 경로 보안 검증
+# ============================================================
+ALLOWED_ROOTS = [HOME, "/var/log"]
+
+
+def is_path_allowed(path):
+    """허용된 경로 범위 내인지 검증"""
+    return any(path.startswith(root) for root in ALLOWED_ROOTS)

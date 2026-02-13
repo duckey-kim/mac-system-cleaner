@@ -2,13 +2,13 @@
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
 import urllib.request
-import urllib.error
 import zipfile
 from .config import VERSION, GITHUB_REPO, LEARNED_PATH
 from .lookup import _load_json, _save_json, _file_lock
@@ -250,9 +250,9 @@ def _update_app_bundle():
         except PermissionError:
             # 권한 부족 시 osascript로 sudo
             _download_status.update(progress=85, message="관리자 권한으로 교체 중...")
-            script = f'''
-            do shell script "rm -rf '{app_path}' && mv '{new_app}' '{app_path}'" with administrator privileges
-            '''
+            escaped_app = shlex.quote(app_path)
+            escaped_new = shlex.quote(new_app)
+            script = f'do shell script "rm -rf {escaped_app} && mv {escaped_new} {escaped_app}" with administrator privileges'
             try:
                 subprocess.run(["osascript", "-e", script], timeout=30, check=True)
             except Exception as e:

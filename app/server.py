@@ -11,7 +11,7 @@ import webbrowser
 
 from urllib.parse import parse_qs, urlparse, unquote
 
-from .config import HOME, PORT, VERSION, reload_folders
+from .config import HOME, PORT, VERSION, reload_folders, is_path_allowed
 from .scanner import scan_system, scan_children
 from .cleaner import delete_path
 from .lookup import lookup_folder
@@ -67,7 +67,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif p.path == "/api/children":
             qs = parse_qs(p.query)
             target = unquote(qs.get("path", [""])[0])
-            if not target or (not target.startswith(HOME) and not target.startswith("/var/")):
+            if not target or not is_path_allowed(target):
                 self._json({"children": [], "error": "허용되지 않는 경로"})
             else:
                 self._json({"children": scan_children(target), "path": target})
@@ -93,10 +93,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         if self.path == "/api/do-update":
-            # 백그라운드에서 업데이트 실행
-            def _run():
-                do_update()
-            t = threading.Thread(target=_run, daemon=True)
+            t = threading.Thread(target=do_update, daemon=True)
             t.start()
             self._json({"started": True, "message": "업데이트 시작됨"})
         elif self.path == "/api/delete":
@@ -105,7 +102,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             p = data.get("path", "")
             recreate = data.get("recreate", False)
             use_sudo = data.get("use_sudo", False)
-            if not p.startswith(HOME) and not p.startswith("/var/log"):
+            if not is_path_allowed(p):
                 self._json({"success": False, "code": "blocked", "message": "보안: 허용되지 않는 경로"})
             else:
                 ok, code, msg = delete_path(p, recreate, use_sudo)

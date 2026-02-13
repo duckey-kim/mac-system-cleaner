@@ -3,29 +3,18 @@
 import json
 import os
 import re
-import sys
 import tempfile
 import threading
 import urllib.request
 import urllib.parse
 from pathlib import Path
 
+from .config import LEARNED_PATH
+
 # ============================================================
 # 저장소 경로
 # ============================================================
-# 1) 영구 저장소: 프로젝트 안 (git에 포함, 캐시 지워도 보존)
-def _get_learned_path():
-    """PyInstaller 번들 / 일반 실행 모두 대응"""
-    if getattr(sys, "frozen", False):
-        # .app 번들: 실행파일 옆에 저장
-        base = os.path.dirname(sys.executable)
-    else:
-        base = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base, "learned_folders.json")
-
-LEARNED_PATH = _get_learned_path()
-
-# 2) 임시 캐시: 홈 디렉토리 (빠른 조회용, 없어져도 OK)
+# 임시 캐시: 홈 디렉토리 (빠른 조회용, 없어져도 OK)
 CACHE_PATH = os.path.join(str(Path.home()), ".mac_cleaner_cache.json")
 
 
