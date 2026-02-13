@@ -5,7 +5,7 @@ Claude Code용 영문 원본: [CLAUDE.md](CLAUDE.md)
 
 ## 개요
 
-macOS System Cleaner v3.2 — macOS 디스크의 불필요한 캐시/빌드 파일을 자동 스캔하고 정리하는 도구.
+macOS System Cleaner v1.0.0 — macOS 디스크의 불필요한 캐시/빌드 파일을 자동 스캔하고 정리하는 도구.
 Python 표준 라이브러리만 사용 (외부 의존성 없음). 프론트엔드는 바닐라 JS 단일 파일 SPA.
 
 ## 명령어

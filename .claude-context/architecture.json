@@ -1,5 +1,5 @@
 {
-  "_description": "macOS System Cleaner v3.2 architecture reference for Claude Code",
+  "_description": "macOS System Cleaner v1.0.0 architecture reference for Claude Code",
   "entry_point": "run.py",
   "server": {
     "file": "app/server.py",
