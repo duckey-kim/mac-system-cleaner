@@ -189,10 +189,13 @@ def _load_json(path):
 
 
 def _save_json(path, data):
-    """JSON 파일 저장"""
+    """JSON 파일 저장 (키별 한 줄 compact 형식)"""
     try:
+        lines = []
+        for key, val in data.items():
+            lines.append(f'"{key}":{json.dumps(val, ensure_ascii=False, separators=(",", ":"))}')
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("{\n" + ",\n".join(lines) + "\n}\n")
     except Exception:
         pass
 
