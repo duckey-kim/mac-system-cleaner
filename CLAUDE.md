@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-macOS System Cleaner v3.2 — Auto-scans and cleans unnecessary cache/build files on macOS.
+macOS System Cleaner v1.0.0 — Auto-scans and cleans unnecessary cache/build files on macOS.
 Uses only Python stdlib (zero external dependencies). Frontend is a single-file vanilla JS SPA.
 
 ## Commands

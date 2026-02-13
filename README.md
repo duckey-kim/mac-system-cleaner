@@ -7,7 +7,7 @@
 [![macOS](https://img.shields.io/badge/macOS-10.15%2B-000000?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-3.2-blue?style=flat-square)](https://github.com/duckey-kim/mac-system-cleaner/releases)
+[![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=flat-square)](https://github.com/duckey-kim/mac-system-cleaner/releases)
 
 **[한국어](#-한국어) | [English](#-english)**
 
