@@ -11,8 +11,7 @@
 
 **[한국어](#-한국어) | [English](#-english)**
 
-<!-- 스크린샷이 있다면 여기에 추가 -->
-<!-- <img src="docs/screenshot.png" alt="Screenshot" width="700"> -->
+<img src="docs/screenshot.png" alt="macOS System Cleaner Screenshot" width="700">
 
 </div>
 
