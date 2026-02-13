@@ -2,8 +2,41 @@
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
+
+GITHUB_REPO = "duckey-kim/mac-system-cleaner"
+
+
+def _get_version():
+    """git tag에서 버전 추출 (PyInstaller 번들에서는 VERSION 파일 사용)"""
+    # 1) PyInstaller 번들: 빌드 시 생성된 VERSION 파일
+    if getattr(sys, "frozen", False):
+        ver_file = os.path.join(sys._MEIPASS, "VERSION")
+        try:
+            with open(ver_file, "r") as f:
+                return f.read().strip()
+        except Exception:
+            pass
+
+    # 2) 개발 환경: git describe --tags
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            capture_output=True, text=True, timeout=5,
+            cwd=os.path.dirname(os.path.abspath(__file__)),
+        )
+        if result.returncode == 0:
+            tag = result.stdout.strip()
+            return tag.lstrip("v")  # "v3.2" -> "3.2"
+    except Exception:
+        pass
+
+    return "dev"
+
+
+VERSION = _get_version()
 
 PORT = 8787
 HOME = str(Path.home())
@@ -37,8 +70,14 @@ def _load_all_folders():
     return {}
 
 
-# 앱 시작 시 한 번 로드
+# 앱 시작 시 한 번 로드 (이후 reload_folders()로 갱신 가능)
 KNOWN_FOLDERS = _load_all_folders()
+
+
+def reload_folders():
+    """learned_folders.json을 다시 읽어서 KNOWN_FOLDERS 갱신"""
+    global KNOWN_FOLDERS
+    KNOWN_FOLDERS = _load_all_folders()
 
 
 def get_folder_info(name):
@@ -47,3 +86,14 @@ def get_folder_info(name):
     if info:
         return info["desc"], info["risk"]
     return "", "unknown"
+
+
+# ============================================================
+# 경로 보안 검증
+# ============================================================
+ALLOWED_ROOTS = [HOME, "/var/log"]
+
+
+def is_path_allowed(path):
+    """허용된 경로 범위 내인지 검증"""
+    return any(path.startswith(root) for root in ALLOWED_ROOTS)

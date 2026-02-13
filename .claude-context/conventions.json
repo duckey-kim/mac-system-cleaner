@@ -1,0 +1,55 @@
+{
+  "_description": "Coding conventions, patterns, and gotchas for macOS System Cleaner",
+  "language": {
+    "backend": "Python 3.8+, stdlib only (no pip packages at runtime)",
+    "frontend": "Vanilla JS/CSS, no framework, no build step",
+    "comments": "Korean (한국어)",
+    "docstrings": "Korean (한국어)"
+  },
+  "pyinstaller_compat": {
+    "description": "All file path resolution must handle both dev and frozen (bundled) modes",
+    "pattern": {
+      "check": "getattr(sys, 'frozen', False)",
+      "dev_base": "os.path.dirname(os.path.abspath(__file__))",
+      "frozen_base": "sys._MEIPASS (for --add-data resources) or os.path.dirname(sys.executable) (for writable files)",
+      "affected_files": ["app/config.py (_get_learned_path)", "app/server.py (_load_html)"]
+    },
+    "important": "learned_folders.json uses sys.executable base (writable), index.html uses _MEIPASS (read-only)"
+  },
+  "security_constraints": {
+    "path_whitelist": {
+      "scan/children": "path must start with HOME or /var/",
+      "delete": "path must start with HOME or /var/log (stricter)"
+    },
+    "sudo_handling": "never store passwords; use osascript for native macOS prompt"
+  },
+  "error_handling_patterns": {
+    "BrokenPipeError": "silently caught in Handler.handle() — browser may close connection early",
+    "delete_failures": "return (success: bool, code: str, message: str) tuple, never raise",
+    "scan_errors": "individual path failures don't break overall scan (parallel executor)"
+  },
+  "performance_patterns": {
+    "du_optimization": "single 'du -d1 -k' call returns all children sizes (not per-child du calls)",
+    "parallel_scan": "ThreadPoolExecutor for 6 simultaneous path scans",
+    "html_caching": "_HTML_CACHE loaded once, served from memory",
+    "lookup_batching": "web lookups batched 4 at a time"
+  },
+  "data_conventions": {
+    "folder_key_format": "always lowercase (e.g., 'deriveddata', not 'DerivedData')",
+    "risk_levels": ["safe (auto-regenerated: caches, builds)", "moderate (reinstall needed: packages)", "caution (data loss possible: backups, projects)"],
+    "size_unit": "scanner returns bytes as int, frontend formats to human-readable"
+  },
+  "frontend_patterns": {
+    "api_communication": "all via fetch() with JSON responses",
+    "drill_down": "recursive: click folder → GET /api/children → render subtree → repeat",
+    "deletion_flow": "checkbox select → confirm modal → POST /api/delete per item → refresh sizes",
+    "sudo_flow": "first try normal delete → if permission error, show sudo modal → retry with use_sudo=true"
+  },
+  "gotchas": [
+    "PORT is defined in config.py but server.py uses find_free_port() which may pick a different port",
+    "reload_folders() is called on every /api/scan to pick up newly learned folder info",
+    "learned_folders.json is both bundled (read at startup) and writable (lookup saves new entries)",
+    "_comment key in learned_folders.json is intentionally stripped on load",
+    "server uses os._exit(0) on KeyboardInterrupt for clean shutdown of all daemon threads"
+  ]
+}

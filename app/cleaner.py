@@ -1,6 +1,7 @@
 """파일 삭제 모듈 — 일반/sudo 삭제 처리"""
 
 import os
+import shlex
 import shutil
 import subprocess
 
@@ -40,7 +41,8 @@ def _delete_sudo(path, recreate):
             )
             if result.returncode != 0:
                 # osascript로 macOS 비밀번호 창 표시
-                script = f'do shell script "rm -rf \'{path}\'" with administrator privileges'
+                escaped = shlex.quote(path)
+                script = f'do shell script "rm -rf {escaped}" with administrator privileges'
                 result2 = subprocess.run(
                     ["osascript", "-e", script],
                     capture_output=True, text=True, timeout=120
@@ -51,7 +53,8 @@ def _delete_sudo(path, recreate):
                 os.makedirs(path, exist_ok=True)
 
         elif os.path.isfile(path):
-            script = f'do shell script "rm -f \'{path}\'" with administrator privileges'
+            escaped = shlex.quote(path)
+            script = f'do shell script "rm -f {escaped}" with administrator privileges'
             result = subprocess.run(
                 ["osascript", "-e", script],
                 capture_output=True, text=True, timeout=120

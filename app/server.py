@@ -11,21 +11,23 @@ import webbrowser
 
 from urllib.parse import parse_qs, urlparse, unquote
 
-from .config import HOME, PORT
+from .config import HOME, PORT, VERSION, reload_folders, is_path_allowed
 from .scanner import scan_system, scan_children
 from .cleaner import delete_path
 from .lookup import lookup_folder
+from .updater import check_update, get_cached_result, check_update_background, do_update, get_download_status
 
 
 def _load_html():
     """HTML 템플릿 로드 (PyInstaller 번들 호환)"""
     if getattr(sys, "frozen", False):
-        base = sys._MEIPASS
+        # PyInstaller: --add-data "app/web/index.html:app/web" → _MEIPASS/app/web/
+        html_path = os.path.join(sys._MEIPASS, "app", "web", "index.html")
     else:
         base = os.path.dirname(os.path.abspath(__file__))
-    html_path = os.path.join(base, "web", "index.html")
+        html_path = os.path.join(base, "web", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        return f.read()
+        return f.read().replace("{{VERSION}}", VERSION)
 
 
 # 서버 시작 시 한 번만 로드
@@ -60,11 +62,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if p.path in ("/", "/index.html"):
             self._ok("text/html", _get_html())
         elif p.path == "/api/scan":
+            reload_folders()  # 검색된 폴더 정보 반영
             self._json(scan_system())
         elif p.path == "/api/children":
             qs = parse_qs(p.query)
             target = unquote(qs.get("path", [""])[0])
-            if not target or (not target.startswith(HOME) and not target.startswith("/var/")):
+            if not target or not is_path_allowed(target):
                 self._json({"children": [], "error": "허용되지 않는 경로"})
             else:
                 self._json({"children": scan_children(target), "path": target})
@@ -77,18 +80,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
             else:
                 result = lookup_folder(name, folder_path)
                 self._json(result)
+        elif p.path == "/api/check-update":
+            result = get_cached_result()
+            if not result.get("checked"):
+                result = check_update()
+            self._json(result)
+        elif p.path == "/api/update-status":
+            self._json(get_download_status())
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
-        if self.path == "/api/delete":
+        if self.path == "/api/do-update":
+            t = threading.Thread(target=do_update, daemon=True)
+            t.start()
+            self._json({"started": True, "message": "업데이트 시작됨"})
+        elif self.path == "/api/delete":
             body = self.rfile.read(int(self.headers["Content-Length"]))
             data = json.loads(body)
             p = data.get("path", "")
             recreate = data.get("recreate", False)
             use_sudo = data.get("use_sudo", False)
-            if not p.startswith(HOME) and not p.startswith("/var/log"):
+            if not is_path_allowed(p):
                 self._json({"success": False, "code": "blocked", "message": "보안: 허용되지 않는 경로"})
             else:
                 ok, code, msg = delete_path(p, recreate, use_sudo)
@@ -130,7 +144,7 @@ def main():
 
     print(f"""
  ╔════════════════════════════════════════════════════════╗
- ║           macOS System Cleaner v3.1                    ║
+ ║           macOS System Cleaner v{VERSION:<24s}║
  ║                                                        ║
  ║   자동 스캔 — 개발 도구 사전 입력 불필요               ║
  ║   브라우저: http://localhost:{port}                       ║
@@ -146,6 +160,9 @@ def main():
     # 서버를 별도 데몬 스레드에서 실행
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
+
+    # 백그라운드 업데이트 확인 (5초 후)
+    check_update_background(delay=5)
 
     # 브라우저 자동 열기
     threading.Timer(0.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
