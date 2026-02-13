@@ -5,6 +5,9 @@ import os
 import sys
 from pathlib import Path
 
+VERSION = "3.2"
+GITHUB_REPO = "duckey-kim/mac-system-cleaner"
+
 PORT = 8787
 HOME = str(Path.home())
 
@@ -37,8 +40,14 @@ def _load_all_folders():
     return {}
 
 
-# 앱 시작 시 한 번 로드
+# 앱 시작 시 한 번 로드 (이후 reload_folders()로 갱신 가능)
 KNOWN_FOLDERS = _load_all_folders()
+
+
+def reload_folders():
+    """learned_folders.json을 다시 읽어서 KNOWN_FOLDERS 갱신"""
+    global KNOWN_FOLDERS
+    KNOWN_FOLDERS = _load_all_folders()
 
 
 def get_folder_info(name):
