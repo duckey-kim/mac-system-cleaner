@@ -1,0 +1,127 @@
+{
+  "_description": "macOS System Cleaner v3.2 architecture reference for Claude Code",
+  "entry_point": "run.py",
+  "server": {
+    "file": "app/server.py",
+    "class": "Handler(http.server.BaseHTTPRequestHandler)",
+    "type": "socketserver.ThreadingTCPServer",
+    "port": {
+      "default": 8787,
+      "fallback": "auto-scan 8787..8807 via find_free_port()"
+    },
+    "threading": "each request in separate thread (daemon_threads=True)"
+  },
+  "api": {
+    "GET /": {
+      "handler": "_get_html()",
+      "returns": "app/web/index.html (cached after first load)"
+    },
+    "GET /api/scan": {
+      "handler": "scanner.scan_system()",
+      "behavior": "reloads learned_folders.json before scan",
+      "returns": "list of {name, path, size, desc, risk}"
+    },
+    "GET /api/children": {
+      "handler": "scanner.scan_children(path)",
+      "params": {"path": "URL-encoded absolute path"},
+      "security": "must start with HOME or /var/",
+      "returns": "{children: [...], path: str}"
+    },
+    "GET /api/lookup": {
+      "handler": "lookup.lookup_folder(name, path)",
+      "params": {"name": "folder name", "path": "folder path"},
+      "returns": "{desc, risk, source}"
+    },
+    "GET /api/check-update": {
+      "handler": "updater.get_cached_result() || updater.check_update()",
+      "returns": "{checked, has_update, latest_version, ...}"
+    },
+    "POST /api/delete": {
+      "handler": "cleaner.delete_path(path, recreate, use_sudo)",
+      "body": {"path": "str", "recreate": "bool", "use_sudo": "bool"},
+      "security": "must start with HOME or /var/log",
+      "returns": "{success, code, message}"
+    }
+  },
+  "components": {
+    "config": {
+      "file": "app/config.py",
+      "exports": ["VERSION", "GITHUB_REPO", "PORT", "HOME", "KNOWN_FOLDERS", "LEARNED_PATH", "reload_folders()", "get_folder_info(name)"],
+      "data_source": "app/learned_folders.json"
+    },
+    "scanner": {
+      "file": "app/scanner.py",
+      "exports": ["scan_system()", "scan_children(path)"],
+      "mechanism": "du -d1 -k via subprocess, ThreadPoolExecutor for parallel scan",
+      "scan_targets": [
+        {"path": "HOME", "min_mb": 100},
+        {"path": "~/Library", "min_mb": 50},
+        {"path": "~/Library/Caches", "min_mb": 30},
+        {"path": "~/Library/Developer", "min_mb": 50},
+        {"path": "~/Library/Application Support", "min_mb": 50},
+        {"path": "~/Library/Containers", "min_mb": 50}
+      ]
+    },
+    "cleaner": {
+      "file": "app/cleaner.py",
+      "exports": ["delete_path(path, recreate, use_sudo)"],
+      "strategies": {
+        "normal": "shutil.rmtree",
+        "sudo": "sudo -n rm -rf (cached) → osascript prompt (fallback)"
+      },
+      "recreate_option": "deletes then recreates empty directory for app compatibility"
+    },
+    "lookup": {
+      "file": "app/lookup.py",
+      "exports": ["lookup_folder(name, path)"],
+      "lookup_chain": [
+        "1. learned_folders.json (permanent store, 41 entries)",
+        "2. ~/.mac_cleaner_cache.json (session cache)",
+        "3. pattern matching (bundle IDs: com.apple.*, keywords: cache/log/node_modules)",
+        "4. DuckDuckGo API (no key required)"
+      ],
+      "auto_save": "results saved back to learned_folders.json and cache"
+    },
+    "updater": {
+      "file": "app/updater.py",
+      "exports": ["check_update()", "get_cached_result()", "check_update_background(delay)"],
+      "mechanism": "GitHub API → latest release check + learned_folders.json remote merge",
+      "github_repo": "duckey-kim/mac-system-cleaner"
+    },
+    "frontend": {
+      "file": "app/web/index.html",
+      "type": "single-file SPA (HTML + CSS + JS inline)",
+      "features": ["dark theme", "infinite drill-down", "batch select/delete", "sudo modal", "real-time scan updates"],
+      "communication": "fetch API to backend JSON endpoints"
+    }
+  },
+  "data": {
+    "learned_folders.json": {
+      "path": "app/learned_folders.json",
+      "format": {"<lowercase_folder_name>": {"desc": "string", "risk": "safe|moderate|caution"}},
+      "special_key": "_comment (stripped on load)",
+      "count": "~41 predefined entries",
+      "categories": ["Xcode", "Android Studio", "Flutter", "Node.js", "Homebrew", "Docker", "JetBrains", "VS Code"]
+    },
+    "cache_file": {
+      "path": "~/.mac_cleaner_cache.json",
+      "purpose": "temporary lookup results between sessions"
+    }
+  },
+  "build": {
+    "script": "build_app.sh",
+    "steps": [
+      "1. verify Python 3 + pip",
+      "2. install PyInstaller if missing",
+      "3. generate PNG icons via pure Python (struct + zlib)",
+      "4. convert PNG → ICNS via iconutil",
+      "5. PyInstaller --onefile --windowed with --add-data for html and json",
+      "6. output: dist/System Cleaner.app"
+    ],
+    "bundle_id": "com.syscleaner.macos",
+    "add_data": [
+      "app/web/index.html:app/web",
+      "app/learned_folders.json:app"
+    ]
+  }
+}
