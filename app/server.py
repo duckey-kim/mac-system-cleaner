@@ -15,7 +15,7 @@ from .config import HOME, PORT, VERSION, reload_folders
 from .scanner import scan_system, scan_children
 from .cleaner import delete_path
 from .lookup import lookup_folder
-from .updater import check_update, get_cached_result, check_update_background
+from .updater import check_update, get_cached_result, check_update_background, do_update, get_download_status
 
 
 def _load_html():
@@ -83,15 +83,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif p.path == "/api/check-update":
             result = get_cached_result()
             if not result.get("checked"):
-                # 아직 백그라운드 체크 안 됐으면 즉시 확인
                 result = check_update()
             self._json(result)
+        elif p.path == "/api/update-status":
+            self._json(get_download_status())
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
-        if self.path == "/api/delete":
+        if self.path == "/api/do-update":
+            # 백그라운드에서 업데이트 실행
+            def _run():
+                do_update()
+            t = threading.Thread(target=_run, daemon=True)
+            t.start()
+            self._json({"started": True, "message": "업데이트 시작됨"})
+        elif self.path == "/api/delete":
             body = self.rfile.read(int(self.headers["Content-Length"]))
             data = json.loads(body)
             p = data.get("path", "")

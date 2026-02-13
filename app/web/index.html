@@ -137,6 +137,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .upd-banner a:hover{text-decoration:underline}
 .upd-banner .close-btn{margin-left:auto;cursor:pointer;color:var(--t3);font-size:16px;padding:0 4px}
 .upd-banner .close-btn:hover{color:var(--t1)}
+.upd-prog{background:var(--s2);border-radius:6px;height:8px;margin-top:8px;overflow:hidden}
+.upd-prog-fill{height:100%;border-radius:6px;background:var(--ac);transition:width .3s}
+.upd-btn{background:var(--ac);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.upd-btn:hover{filter:brightness(1.15)}
+.upd-btn:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:640px){.sum{grid-template-columns:1fr}.wrap{padding:14px 14px 100px}}
 </style>
 </head>
@@ -529,6 +534,7 @@ function updBar(){
 }
 
 // ── 자동 업데이트 확인 ──
+let updating=false;
 async function checkForUpdate(){
   try{
     const r=await fetch('/api/check-update');
@@ -538,17 +544,26 @@ async function checkForUpdate(){
 
     let html='';
 
-    // 앱 업데이트 알림
     if(res.app_update){
-      html+=`<div class="upd-banner">
+      const v=res.app_update.version;
+      const canAuto=res.app_update.can_auto_update;
+      html+=`<div class="upd-banner" id="updBannerInner">
         <span style="font-size:18px">&#x1F680;</span>
-        <div><strong>새 버전 v${res.app_update.version}</strong> 사용 가능!
-        <a href="${res.app_update.url}" target="_blank">다운로드 &rarr;</a></div>
+        <div style="flex:1">
+          <strong>새 버전 v${v}</strong> 사용 가능!
+          ${canAuto
+            ?`<button class="upd-btn" id="updBtn" onclick="startUpdate()" style="margin-left:10px">지금 업데이트</button>`
+            :`<a href="${res.app_update.url}" target="_blank">GitHub에서 다운로드 &rarr;</a>`
+          }
+          <div id="updProgress" style="display:none">
+            <div class="upd-prog"><div class="upd-prog-fill" id="updBar" style="width:0%"></div></div>
+            <div id="updMsg" style="font-size:11px;color:var(--t2);margin-top:4px"></div>
+          </div>
+        </div>
         <span class="close-btn" onclick="this.parentElement.remove()">&times;</span>
       </div>`;
     }
 
-    // DB 업데이트 알림
     if(res.db_new_count>0){
       toast(res.db_new_count+'개 폴더 정보가 업데이트되었습니다');
     }
@@ -558,6 +573,58 @@ async function checkForUpdate(){
       banner.style.display='block';
     }
   }catch(e){/* 네트워크 오류 무시 */}
+}
+
+async function startUpdate(){
+  if(updating)return;
+  updating=true;
+  const btn=document.getElementById('updBtn');
+  if(btn){btn.disabled=true;btn.textContent='업데이트 중...';}
+  const prog=document.getElementById('updProgress');
+  if(prog)prog.style.display='block';
+
+  try{
+    await fetch('/api/do-update',{method:'POST'});
+    // 진행 상태 폴링
+    pollUpdateStatus();
+  }catch(e){
+    toast('업데이트 시작 실패: '+e.message,true);
+    updating=false;
+    if(btn){btn.disabled=false;btn.textContent='지금 업데이트';}
+  }
+}
+
+async function pollUpdateStatus(){
+  const bar=document.getElementById('updBar');
+  const msg=document.getElementById('updMsg');
+  const btn=document.getElementById('updBtn');
+
+  const poll=async()=>{
+    try{
+      const r=await fetch('/api/update-status');
+      const s=await r.json();
+      if(bar)bar.style.width=s.progress+'%';
+      if(msg)msg.textContent=s.message;
+
+      if(s.status==='done'){
+        if(bar)bar.style.background='var(--gn)';
+        if(btn){btn.textContent='재시작 필요';btn.disabled=false;btn.onclick=()=>{toast('앱을 종료하고 다시 실행하세요');}}
+        toast('업데이트 완료! 앱을 재시작하세요.');
+        updating=false;
+        return;
+      }
+      if(s.status==='error'){
+        if(bar)bar.style.background='var(--rd)';
+        if(btn){btn.textContent='재시도';btn.disabled=false;btn.onclick=()=>startUpdate();}
+        toast('업데이트 실패: '+s.message,true);
+        updating=false;
+        return;
+      }
+      // 아직 진행 중
+      setTimeout(poll,500);
+    }catch(e){setTimeout(poll,1000);}
+  };
+  poll();
 }
 </script>
 </body>
