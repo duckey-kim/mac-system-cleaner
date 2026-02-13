@@ -136,7 +136,19 @@ else
     ICON_OPT=""
 fi
 
-# 5) PyInstaller로 .app 빌드
+# 5) 버전 추출 (git tag → VERSION 파일)
+echo ""
+echo "🏷️  버전 추출 중..."
+GIT_VERSION=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+if [ -z "$GIT_VERSION" ]; then
+    GIT_VERSION="dev"
+    echo "   ⚠️  git tag 없음 — VERSION=dev"
+else
+    echo "   ✅ VERSION=$GIT_VERSION (git tag)"
+fi
+echo "$GIT_VERSION" > "$SCRIPT_DIR/VERSION"
+
+# 6) PyInstaller로 .app 빌드
 echo ""
 echo "🔨 앱 빌드 중... (1~2분 소요)"
 echo ""
@@ -153,9 +165,10 @@ python3 -m PyInstaller \
     --osx-bundle-identifier "com.syscleaner.macos" \
     --add-data "app/web/index.html:app/web" \
     --add-data "app/learned_folders.json:app" \
+    --add-data "VERSION:." \
     run.py
 
-# 6) 결과 확인
+# 7) 결과 확인
 APP_PATH="$SCRIPT_DIR/dist/$APP_NAME.app"
 
 if [ -d "$APP_PATH" ]; then
@@ -192,10 +205,10 @@ else
     exit 1
 fi
 
-# 7) 정리
+# 8) 정리
 echo ""
 echo "🧹 임시 파일 정리 중..."
-rm -rf "$SCRIPT_DIR/build" "$SCRIPT_DIR/$APP_NAME.spec" "$ICONSET_DIR" "$ICNS_PATH" 2>/dev/null
+rm -rf "$SCRIPT_DIR/build" "$SCRIPT_DIR/$APP_NAME.spec" "$ICONSET_DIR" "$ICNS_PATH" "$SCRIPT_DIR/VERSION" 2>/dev/null
 echo "✅ 정리 완료"
 echo ""
 echo "🎉 끝! 이제 'System Cleaner' 앱을 더블클릭해서 사용하세요."

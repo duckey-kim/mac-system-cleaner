@@ -149,7 +149,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 <div class="wrap">
   <div class="hdr">
     <h1>macOS System Cleaner</h1>
-    <p>v3.2 · 자동 스캔 · 용량 큰 폴더 자동 탐색 · 드릴다운</p>
+    <p>v{{VERSION}} · 자동 스캔 · 용량 큰 폴더 자동 탐색 · 드릴다운</p>
   </div>
   <div id="updateBanner" style="display:none"></div>
   <div class="status" id="statusBar">&#x1F7E1; 시작 중...</div>
@@ -518,7 +518,7 @@ function render(){
     h+=`</div></div>`;
   });
 
-  h+=`<div class="ftr">macOS System Cleaner v3.2 · 자동 스캔 · 삭제 전 백업 권장</div>`;
+  h+=`<div class="ftr">macOS System Cleaner v{{VERSION}} · 자동 스캔 · 삭제 전 백업 권장</div>`;
   document.getElementById('app').innerHTML=h;
   updBar(); updStatus();
 }

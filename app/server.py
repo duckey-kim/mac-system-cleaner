@@ -27,7 +27,7 @@ def _load_html():
         base = os.path.dirname(os.path.abspath(__file__))
         html_path = os.path.join(base, "web", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        return f.read()
+        return f.read().replace("{{VERSION}}", VERSION)
 
 
 # 서버 시작 시 한 번만 로드
@@ -144,7 +144,7 @@ def main():
 
     print(f"""
  ╔════════════════════════════════════════════════════════╗
- ║           macOS System Cleaner v3.2                    ║
+ ║           macOS System Cleaner v{VERSION:<24s}║
  ║                                                        ║
  ║   자동 스캔 — 개발 도구 사전 입력 불필요               ║
  ║   브라우저: http://localhost:{port}                       ║
