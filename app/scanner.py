@@ -1,9 +1,8 @@
-"""파일 시스템 스캔 모듈 — 큰 폴더 자동 탐색"""
+"""파일 시스템 스캔 모듈 — du -d2 단일 호출로 ~/Library 전체 탐색"""
 
 import os
 import shutil
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import HOME, get_folder_info
 
@@ -20,42 +19,34 @@ def format_size(size_bytes):
         return f"{size_bytes / (1024**3):.2f} GB"
 
 
-def get_dir_size(path):
-    """디렉토리 크기를 바이트로 반환 (du -sk 사용) — 단일 폴더용"""
-    try:
-        result = subprocess.run(
-            ["du", "-sk", path],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode == 0:
-            return int(result.stdout.split()[0]) * 1024
-    except Exception:
-        pass
-    return 0
+def _parse_du(output, base_path):
+    """du 출력을 파싱하여 {path: size_bytes} dict 반환"""
+    sizes = {}
+    for line in output.strip().split("\n"):
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        try:
+            path = parts[1]
+            if path != base_path:
+                sizes[path] = int(parts[0]) * 1024
+        except ValueError:
+            continue
+    return sizes
 
 
 def get_children_sizes(parent_path):
-    """du -d1 -k 로 하위 폴더 크기를 한 번에 가져오기 (핵심 최적화)"""
-    sizes = {}
+    """du -d1 -k 로 하위 폴더 크기를 한 번에 가져오기 (drill-down용)"""
     try:
         result = subprocess.run(
             ["du", "-d1", "-k", parent_path],
             capture_output=True, text=True, timeout=60
         )
-        if result.returncode in (0, 1):  # 1 = 일부 권한 오류 (무시)
-            for line in result.stdout.strip().split("\n"):
-                parts = line.split("\t", 1)
-                if len(parts) == 2:
-                    try:
-                        kb = int(parts[0])
-                        p = parts[1]
-                        if p != parent_path:
-                            sizes[p] = kb * 1024
-                    except ValueError:
-                        continue
+        if result.returncode in (0, 1):
+            return _parse_du(result.stdout, parent_path)
     except Exception:
         pass
-    return sizes
+    return {}
 
 
 def get_disk_info():
@@ -82,103 +73,98 @@ def get_disk_info():
         }
 
 
-def scan_top_folders(base_path, min_size_mb=50):
-    """base_path의 직속 하위 폴더를 크기 순으로 반환 (du -d1 한 번으로 일괄 조회)"""
-    results = []
-    min_bytes = min_size_mb * 1024 * 1024
-
-    sizes = get_children_sizes(base_path)
-
+def _make_item(path, name, size):
+    """스캔 결과 항목 하나를 dict로 구성"""
     try:
-        entries = os.listdir(base_path)
-    except (PermissionError, OSError):
-        return results
-
-    for entry in entries:
-        full_path = os.path.join(base_path, entry)
-        try:
-            if os.path.islink(full_path):
-                continue
-            is_dir = os.path.isdir(full_path)
-
-            size = sizes.get(full_path, 0)
-            if size == 0 and not is_dir:
-                try:
-                    size = os.path.getsize(full_path)
-                except OSError:
-                    continue
-
-            if size < min_bytes:
-                continue
-
-            children_count = 0
-            if is_dir:
-                try:
-                    children_count = len(os.listdir(full_path))
-                except Exception:
-                    pass
-
-            desc, risk = get_folder_info(entry)
-            results.append({
-                "name": entry,
-                "path": full_path,
-                "size": size,
-                "size_formatted": format_size(size),
-                "is_dir": is_dir,
-                "children_count": children_count,
-                "description": desc,
-                "risk": risk,
-                "drillable": is_dir and children_count > 0,
-            })
-        except Exception:
-            continue
-
-    results.sort(key=lambda x: x["size"], reverse=True)
-    return results
+        if os.path.islink(path):
+            return None
+        is_dir = os.path.isdir(path)
+        children_count = 0
+        if is_dir:
+            try:
+                children_count = len(os.listdir(path))
+            except Exception:
+                pass
+        desc, risk = get_folder_info(name)
+        return {
+            "name": name,
+            "path": path,
+            "size": size,
+            "size_formatted": format_size(size),
+            "is_dir": is_dir,
+            "children_count": children_count,
+            "description": desc,
+            "risk": risk,
+            "drillable": is_dir and children_count > 0,
+        }
+    except Exception:
+        return None
 
 
 def scan_system():
-    """시스템 자동 스캔 — 주요 경로의 큰 폴더를 병렬로 탐색"""
-    scan_roots = [
-        {"label": "홈 디렉토리", "path": HOME, "min_mb": 100},
-        {"label": "Library", "path": os.path.join(HOME, "Library"), "min_mb": 50},
-        {"label": "Library/Caches", "path": os.path.join(HOME, "Library", "Caches"), "min_mb": 30},
-        {"label": "Library/Developer", "path": os.path.join(HOME, "Library", "Developer"), "min_mb": 30},
-        {"label": "Library/Application Support", "path": os.path.join(HOME, "Library", "Application Support"), "min_mb": 50},
-        {"label": "Library/Containers", "path": os.path.join(HOME, "Library", "Containers"), "min_mb": 50},
-    ]
+    """시스템 자동 스캔 — du -d2 한 번으로 ~/Library 전체 탐색 (하드코딩 없음)"""
+    library_path = os.path.join(HOME, "Library")
+    min_group_bytes = 50 * 1024 * 1024   # depth-1 그룹: 50MB
+    min_item_bytes = 20 * 1024 * 1024    # depth-2 항목: 20MB
 
-    def scan_one(root):
-        if not os.path.isdir(root["path"]):
-            return None
-        items = scan_top_folders(root["path"], min_size_mb=root["min_mb"])
-        return {"root": root, "items": items}
+    # ---- 1) du -d2 단일 호출로 전체 크기 수집 ----
+    all_sizes = {}
+    try:
+        result = subprocess.run(
+            ["du", "-d2", "-k", library_path],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode in (0, 1):
+            all_sizes = _parse_du(result.stdout, library_path)
+    except Exception:
+        pass
 
+    # ---- 2) depth-1 / depth-2 분류 ----
+    d1_sizes = {}          # d1_path -> size
+    d2_by_parent = {}      # d1_path -> [(d2_path, size, name)]
+
+    for path, size in all_sizes.items():
+        rel = os.path.relpath(path, library_path)
+        segments = rel.split(os.sep)
+        if len(segments) == 1:
+            d1_sizes[path] = size
+        elif len(segments) == 2:
+            parent = os.path.join(library_path, segments[0])
+            d2_by_parent.setdefault(parent, []).append(
+                (path, size, segments[1])
+            )
+
+    # ---- 3) 그룹 구성: depth-1별로 depth-2 항목 묶기 ----
     groups = []
-    all_paths_seen = set()
-
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {executor.submit(scan_one, r): r for r in scan_roots}
-        results_map = {}
-        for future in as_completed(futures):
-            root = futures[future]
-            results_map[root["label"]] = future.result()
-
-    for root in scan_roots:
-        result = results_map.get(root["label"])
-        if not result:
+    for d1_path in sorted(d1_sizes, key=d1_sizes.get, reverse=True):
+        d1_size = d1_sizes[d1_path]
+        if d1_size < min_group_bytes:
             continue
-        filtered = []
-        for item in result["items"]:
-            if item["path"] not in all_paths_seen:
-                filtered.append(item)
-                all_paths_seen.add(item["path"])
-        if filtered:
-            total_size = sum(it["size"] for it in filtered)
+
+        folder_name = os.path.basename(d1_path)
+
+        items = []
+        for d2_path, d2_size, d2_name in d2_by_parent.get(d1_path, []):
+            if d2_size < min_item_bytes:
+                continue
+            item = _make_item(d2_path, d2_name, d2_size)
+            if item:
+                items.append(item)
+
+        items.sort(key=lambda x: x["size"], reverse=True)
+
+        # depth-2 항목이 없으면 depth-1 폴더 자체를 drillable 항목으로
+        if not items:
+            item = _make_item(d1_path, folder_name, d1_size)
+            if item:
+                items.append(item)
+
+        if items:
+            total_size = sum(it["size"] for it in items)
             groups.append({
-                "label": root["label"],
-                "path": root["path"],
-                "items": filtered[:20],
+                "label": f"Library/{folder_name}",
+                "path": d1_path,
+                "items": items[:20],
                 "total_size": total_size,
                 "total_size_formatted": format_size(total_size),
             })
