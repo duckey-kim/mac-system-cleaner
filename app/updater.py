@@ -14,6 +14,16 @@ from .config import VERSION, GITHUB_REPO, LEARNED_PATH
 from .lookup import _load_json, _save_json, _file_lock
 
 
+def _is_newer(remote, local):
+    """remote 버전이 local보다 높은지 비교 (SemVer 호환)"""
+    def parse(v):
+        try:
+            return tuple(int(x) for x in v.split("."))
+        except (ValueError, AttributeError):
+            return (0,)
+    return parse(remote) > parse(local)
+
+
 # GitHub API / Raw 경로
 _API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 _DB_RAW_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/app/learned_folders.json"
@@ -59,7 +69,7 @@ def check_update():
         latest_tag = data.get("tag_name", "").lstrip("v")
         html_url = data.get("html_url", "")
 
-        if latest_tag and latest_tag != VERSION:
+        if latest_tag and _is_newer(latest_tag, VERSION):
             # 릴리즈 assets에서 .zip 찾기
             download_url = None
             for asset in data.get("assets", []):
