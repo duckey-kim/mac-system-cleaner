@@ -9,7 +9,7 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-from .config import LEARNED_PATH
+from .config import LEARNED_PATH, VERSION
 
 # ============================================================
 # 저장소 경로
@@ -118,7 +118,7 @@ def web_search(name, path=""):
             + "&format=json&no_html=1&skip_disambig=1"
         )
 
-        req = urllib.request.Request(url, headers={"User-Agent": "MacCleaner/3.1"})
+        req = urllib.request.Request(url, headers={"User-Agent": "MacCleaner/" + VERSION})
         with urllib.request.urlopen(req, timeout=5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
 
@@ -184,6 +184,7 @@ _file_lock = threading.Lock()
 
 def _save_json(path, data):
     """JSON 파일 저장 (키별 한 줄 compact 형식, atomic write)"""
+    tmp_path = None
     try:
         lines = []
         for key, val in data.items():
@@ -198,10 +199,11 @@ def _save_json(path, data):
             tmp_path = tmp.name
         os.replace(tmp_path, path)
     except Exception:
-        try:
-            os.unlink(tmp_path)
-        except Exception:
-            pass
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 def _load_learned():
