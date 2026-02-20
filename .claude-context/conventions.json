@@ -26,7 +26,8 @@
   "error_handling_patterns": {
     "BrokenPipeError": "silently caught in Handler.handle() — browser may close connection early",
     "delete_failures": "return (success: bool, code: str, message: str) tuple, never raise",
-    "scan_errors": "individual path failures don't break overall scan (parallel executor)"
+    "scan_errors": "individual path failures don't break overall scan (parallel executor)",
+    "subprocess_safety": "always wrap subprocess.run with (TimeoutExpired, FileNotFoundError, OSError) catch"
   },
   "performance_patterns": {
     "du_optimization": "single 'du -d1 -k' call returns all children sizes (not per-child du calls)",
@@ -45,11 +46,25 @@
     "deletion_flow": "checkbox select → confirm modal → POST /api/delete per item → refresh sizes",
     "sudo_flow": "first try normal delete → if permission error, show sudo modal → retry with use_sudo=true"
   },
+  "thread_safety_patterns": {
+    "history_module": "threading.Lock() protects all file read/write to ~/.mac_cleaner_history.json",
+    "rule": "any shared mutable state (file or in-memory) must be protected with a lock"
+  },
+  "sudo_escalation_pattern": {
+    "description": "2-stage sudo for macOS: try cached sudo first, then GUI prompt",
+    "stage1": "sudo -n (non-interactive, uses cached credentials)",
+    "stage2": "osascript 'do shell script ... with administrator privileges' (native password dialog)",
+    "used_in": ["app/cleaner.py", "app/tm_manager.py"],
+    "security": "shlex.quote() for all user-provided strings in shell commands"
+  },
   "gotchas": [
     "PORT is defined in config.py but server.py uses find_free_port() which may pick a different port",
     "reload_folders() is called on every /api/scan to pick up newly learned folder info",
     "learned_folders.json is both bundled (read at startup) and writable (lookup saves new entries)",
     "_comment key in learned_folders.json is intentionally stripped on load",
-    "server uses os._exit(0) on KeyboardInterrupt for clean shutdown of all daemon threads"
+    "server uses os._exit(0) on KeyboardInterrupt for clean shutdown of all daemon threads",
+    "history file (~/.mac_cleaner_history.json) is FIFO capped at 500 records to prevent unbounded growth",
+    "TM snapshot size estimation falls back from tmutil → diskutil if first method returns 0",
+    "POST /api/delete now records deletion to history (side effect added in v1.1.0)"
   ]
 }
