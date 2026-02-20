@@ -5,7 +5,8 @@ Claude Code용 영문 원본: [CLAUDE.md](CLAUDE.md)
 
 ## 개요
 
-macOS System Cleaner v1.0.0 — macOS 디스크의 불필요한 캐시/빌드 파일을 자동 스캔하고 정리하는 도구.
+macOS System Cleaner — macOS 디스크의 불필요한 캐시/빌드 파일을 자동 스캔하고 정리하는 도구.
+버전은 git tag 기반 단일 진실 공급원 (`app/config.py:_get_version()`).
 Python 표준 라이브러리만 사용 (외부 의존성 없음). 프론트엔드는 바닐라 JS 단일 파일 SPA.
 
 ## 명령어
@@ -13,9 +14,16 @@ Python 표준 라이브러리만 사용 (외부 의존성 없음). 프론트엔�
 ```bash
 python3 run.py          # 개발 실행 (localhost:8787 자동 오픈)
 ./build_app.sh          # .app 빌드 (PyInstaller, 스크립트가 자동 설치)
+python3 -m pytest tests/ # 테스트 실행 (unittest 기반, 외부 의존성 없음)
 ```
 
-테스트 프레임워크 없음. 빌드 검증은 `./build_app.sh` 실행으로 확인.
+테스트는 `tests/` 디렉토리에 위치 (unittest 기반). 빌드 검증은 `./build_app.sh` 실행으로 확인.
+
+## Git Workflow
+
+- 브랜치 모델: git flow (feature -> develop -> release -> main + tag)
+- 작업 브랜치: `develop`
+- 버전 태그는 `main` 브랜치에서만
 
 ## 핵심 규칙
 

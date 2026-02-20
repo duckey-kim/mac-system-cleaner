@@ -1,5 +1,5 @@
 {
-  "_description": "macOS System Cleaner v1.0.0 architecture reference for Claude Code",
+  "_description": "macOS System Cleaner architecture reference for Claude Code",
   "entry_point": "run.py",
   "server": {
     "file": "app/server.py",
@@ -100,7 +100,7 @@
       "path": "app/learned_folders.json",
       "format": {"<lowercase_folder_name>": {"desc": "string", "risk": "safe|moderate|caution"}},
       "special_key": "_comment (stripped on load)",
-      "count": "~41 predefined entries",
+      "count": "~74 predefined entries",
       "categories": ["Xcode", "Android Studio", "Flutter", "Node.js", "Homebrew", "Docker", "JetBrains", "VS Code"]
     },
     "cache_file": {
