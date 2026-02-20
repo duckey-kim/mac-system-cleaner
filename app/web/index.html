@@ -142,6 +142,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .upd-btn{background:var(--ac);color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .upd-btn:hover{filter:brightness(1.15)}
 .upd-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* TM Modal */
+.tm-list{max-height:300px;overflow-y:auto;margin:10px 0}
+.tm-row{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--bd);font-size:12px}
+.tm-row:last-child{border-bottom:none}
+.tm-date{color:var(--t1);font-family:'SF Mono',Monaco,monospace}
+
+/* History Modal */
+.hist-list{max-height:350px;overflow-y:auto;margin:10px 0}
+.hist-row{display:flex;align-items:center;padding:8px 12px;gap:10px;border-bottom:1px solid var(--bd);font-size:12px}
+.hist-row:last-child{border-bottom:none}
+.hist-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.hist-sz{flex-shrink:0;color:var(--gn);font-weight:600}
+.hist-tm{flex-shrink:0;color:var(--t3);font-size:10px}
+.hist-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.hist-stat{background:var(--s2);border-radius:8px;padding:10px;text-align:center}
+.hist-stat .hv{font-size:18px;font-weight:700;color:var(--gn)}
+.hist-stat .hl{font-size:10px;color:var(--t2);margin-top:2px}
+
 @media(max-width:640px){.sum{grid-template-columns:1fr}.wrap{padding:14px 14px 100px}}
 </style>
 </head>
@@ -177,6 +196,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 <div class="mbg" id="sudoBM"><div class="mdl">
   <h3 style="color:var(--yw)">&#x1F512; 일부 항목 권한 부족</h3><p id="sudoBBody"></p>
   <div class="mdl-a"><button class="btn btn-o" onclick="closeSudoB()">건너뛰기</button><button class="btn btn-a" onclick="doSudoB()">sudo로 재시도</button></div>
+</div></div>
+
+<!-- TM modal -->
+<div class="mbg" id="tmModal"><div class="mdl" style="max-width:520px">
+  <h3>Time Machine 스냅샷 관리</h3>
+  <p id="tmInfo" style="margin-bottom:8px"></p>
+  <div id="tmList" class="tm-list"></div>
+  <div class="mdl-a">
+    <button class="btn btn-o" onclick="closeTmModal()">닫기</button>
+    <button class="btn btn-d" id="tmDelAll" onclick="tmDeleteAll()" style="display:none">전체 삭제</button>
+  </div>
+</div></div>
+
+<!-- History modal -->
+<div class="mbg" id="histModal"><div class="mdl" style="max-width:520px">
+  <h3>삭제 이력</h3>
+  <div id="histStats" class="hist-stats"></div>
+  <div id="histList" class="hist-list"></div>
+  <div class="mdl-a"><button class="btn btn-o" onclick="closeHistModal()">닫기</button></div>
 </div></div>
 
 <!-- Selection bar -->
@@ -355,12 +393,13 @@ function applyLookup(path,desc,risk,source){
 // ── Delete ──
 async function delOne(path,recreate,sudo=false){
   if(!sudo&&!confirm('삭제할까요?\n'+path))return;
+  const info=findItemByPath(path);
+  const sz=info?info.size:0;
   try{
-    const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,recreate,use_sudo:sudo})});
+    const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,recreate,use_sudo:sudo,size:sz})});
     const res=await r.json();
     if(res.success){
       del_.add(path);
-      const info=findItemByPath(path);
       if(info) totalFreed+=info.size;
       toast(sudo?'sudo 삭제 완료':'삭제 완료');
       render();
@@ -393,7 +432,7 @@ async function confirmBulk(){
   closeModal();const items=[];sel.forEach(k=>{const i=resolv(k);if(i)items.push(i);});
   let ok=0,freed=0,pf=[];
   for(const it of items){try{
-    const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,recreate:it.recreate||false})});
+    const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,recreate:it.recreate||false,size:it.size||0})});
     const res=await r.json();
     if(res.success){del_.add(it.path);ok++;freed+=it.size;}
     else if(res.code==='permission_denied')pf.push(it);
@@ -407,7 +446,7 @@ async function confirmBulk(){
 }
 function closeSudoB(){document.getElementById('sudoBM').classList.remove('on');}
 async function doSudoB(){closeSudoB();const items=window._spf||[];toast('sudo 시도 중...');let ok=0,freed=0;
-  for(const it of items){try{const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,recreate:it.recreate||false,use_sudo:true})});const res=await r.json();if(res.success){del_.add(it.path);ok++;freed+=it.size;}}catch(e){}}
+  for(const it of items){try{const r=await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:it.path,recreate:it.recreate||false,use_sudo:true,size:it.size||0})});const res=await r.json();if(res.success){del_.add(it.path);ok++;freed+=it.size;}}catch(e){}}
   if(ok>0){toast(ok+'개 sudo 삭제 ('+fmtB(freed)+')');totalFreed+=freed;}render();
 }
 
@@ -444,13 +483,17 @@ function render(){
 
   if(unknownCnt>0) h+=`<div class="tm" style="cursor:pointer;border-color:var(--ac)" onclick="lookupAll()"><span style="font-size:18px">&#x1F50D;</span><div><strong>모르는 폴더 ${unknownCnt}개</strong> — 클릭하면 자동으로 검색합니다<br><span style="color:var(--t3);font-size:10px">패턴 매칭 + 웹 검색 · 결과는 캐시에 저장됨</span></div></div>`;
 
-  if(D.tm_snapshots>0) h+=`<div class="tm"><span style="font-size:18px">&#x23F1;</span><div><strong>Time Machine 스냅샷 ${D.tm_snapshots}개</strong><br><span style="color:var(--t2)"><code>sudo tmutil thinlocalsnapshots / 99999999999999 1</code></span></div></div>`;
+  if(D.tm_snapshots>0) h+=`<div class="tm" style="cursor:pointer" onclick="openTmModal()"><span style="font-size:18px">&#x23F1;</span><div><strong>Time Machine 스냅샷 ${D.tm_snapshots}개</strong><br><span style="color:var(--t2)">클릭하여 관리 (개별/전체 삭제)</span></div><button class="btn btn-o btn-sm" onclick="event.stopPropagation();openTmModal()">관리</button></div>`;
 
   h+=`<div class="abar"><div class="left">
-    <button class="btn btn-o btn-sm" onclick="selSafe()">안전 항목 선택</button>
+    <button class="btn btn-a btn-sm" onclick="quickCleanSafe()" style="background:var(--gn)">안전 항목 정리</button>
+    <button class="btn btn-o btn-sm" onclick="selSafe()">안전 선택</button>
     <button class="btn btn-o btn-sm" onclick="selAll()">전체 선택</button>
     <button class="btn btn-o btn-sm" onclick="clearSel()">해제</button>
-  </div><button class="btn btn-a btn-sm" onclick="doScan()">다시 스캔</button></div>`;
+  </div><div style="display:flex;gap:6px">
+    <button class="btn btn-o btn-sm" onclick="openHistModal()">삭제 이력</button>
+    <button class="btn btn-a btn-sm" onclick="doScan()">다시 스캔</button>
+  </div></div>`;
 
   D.groups.forEach((g,gi)=>{
     h+=`<div class="grp"><div class="grp-head" onclick="togGrp(${gi})">
@@ -593,6 +636,97 @@ async function startUpdate(){
     if(btn){btn.disabled=false;btn.textContent='지금 업데이트';}
   }
 }
+
+// ── TM 스냅샷 관리 ──
+async function openTmModal(){
+  document.getElementById('tmModal').classList.add('on');
+  document.getElementById('tmList').innerHTML='<div style="text-align:center;padding:16px;color:var(--t2)"><div class="spin" style="width:20px;height:20px;margin:0 auto 6px;border-width:2px"></div>스냅샷 조회 중...</div>';
+  document.getElementById('tmDelAll').style.display='none';
+  document.getElementById('tmInfo').textContent='';
+  try{
+    const r=await fetch('/api/tm-snapshots');const d=await r.json();
+    if(!d.snapshots.length){
+      document.getElementById('tmList').innerHTML='<div style="text-align:center;padding:16px;color:var(--t3)">스냅샷이 없습니다</div>';
+      document.getElementById('tmInfo').textContent='로컬 스냅샷 없음';
+      return;
+    }
+    document.getElementById('tmInfo').innerHTML=`${d.count}개 스냅샷${d.size_formatted!=='N/A'?' · 약 '+d.size_formatted:''}`;
+    document.getElementById('tmDelAll').style.display='inline-flex';
+    let h='';
+    d.snapshots.forEach(s=>{
+      h+=`<div class="tm-row" id="tm-${s.date}"><span class="tm-date">${s.display}</span><button class="btn btn-o btn-sm" onclick="tmDeleteOne('${s.date}')">삭제</button></div>`;
+    });
+    document.getElementById('tmList').innerHTML=h;
+  }catch(e){
+    document.getElementById('tmList').innerHTML='<div style="color:var(--rd);padding:12px">오류: '+e.message+'</div>';
+  }
+}
+function closeTmModal(){document.getElementById('tmModal').classList.remove('on');}
+async function tmDeleteOne(date){
+  const row=document.getElementById('tm-'+date);
+  if(row)row.querySelector('button').disabled=true;
+  try{
+    const r=await fetch('/api/tm-delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date})});
+    const res=await r.json();
+    if(res.success){if(row){row.style.opacity='0.4';row.style.textDecoration='line-through';}toast('스냅샷 삭제 완료');}
+    else{toast(res.message,true);if(row)row.querySelector('button').disabled=false;}
+  }catch(e){toast('오류: '+e.message,true);if(row)row.querySelector('button').disabled=false;}
+}
+async function tmDeleteAll(){
+  if(!confirm('모든 Time Machine 스냅샷을 삭제하시겠습니까?'))return;
+  document.getElementById('tmDelAll').disabled=true;
+  try{
+    const r=await fetch('/api/tm-delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({date:'__all__'})});
+    const res=await r.json();
+    toast(res.message);closeTmModal();
+  }catch(e){toast('오류: '+e.message,true);}
+  document.getElementById('tmDelAll').disabled=false;
+}
+
+// ── 원클릭 안전 정리 ──
+function quickCleanSafe(){
+  if(!D||!D.groups.length)return;
+  sel.clear();
+  let cnt=0;
+  D.groups.forEach((g,gi)=>g.items.forEach((it,ii)=>{
+    if(it.risk==='safe'&&!del_.has(it.path)){sel.add(gi+'-'+ii);cnt++;}
+  }));
+  if(!cnt){toast('안전 삭제 가능한 항목이 없습니다');return;}
+  render();showBulkModal();
+}
+
+// ── 삭제 이력 ──
+async function openHistModal(){
+  document.getElementById('histModal').classList.add('on');
+  document.getElementById('histList').innerHTML='<div style="text-align:center;padding:16px;color:var(--t2)"><div class="spin" style="width:20px;height:20px;margin:0 auto 6px;border-width:2px"></div>이력 로드 중...</div>';
+  document.getElementById('histStats').innerHTML='';
+  try{
+    const r=await fetch('/api/history');const d=await r.json();
+    const st=d.stats;
+    document.getElementById('histStats').innerHTML=
+      `<div class="hist-stat"><div class="hv">${st.total_deleted}개</div><div class="hl">총 삭제 항목</div></div>`+
+      `<div class="hist-stat"><div class="hv">${st.total_size_formatted}</div><div class="hl">총 확보 용량</div></div>`+
+      `<div class="hist-stat"><div class="hv">${st.this_month}개</div><div class="hl">이번 달 삭제</div></div>`+
+      `<div class="hist-stat"><div class="hv">${st.this_month_size_formatted}</div><div class="hl">이번 달 확보</div></div>`;
+    if(!d.records.length){
+      document.getElementById('histList').innerHTML='<div style="text-align:center;padding:16px;color:var(--t3)">삭제 이력이 없습니다</div>';
+      return;
+    }
+    let h='';
+    d.records.forEach(r=>{
+      h+=`<div class="hist-row">
+        <span style="color:${r.success?'var(--gn)':'var(--rd)'}">${r.success?'&#x2705;':'&#x274C;'}</span>
+        <span class="hist-nm" title="${r.path}">${r.name}</span>
+        <span class="hist-sz">${r.size_formatted}</span>
+        <span class="hist-tm">${r.time_ago}</span>
+      </div>`;
+    });
+    document.getElementById('histList').innerHTML=h;
+  }catch(e){
+    document.getElementById('histList').innerHTML='<div style="color:var(--rd);padding:12px">오류: '+e.message+'</div>';
+  }
+}
+function closeHistModal(){document.getElementById('histModal').classList.remove('on');}
 
 async function pollUpdateStatus(){
   const bar=document.getElementById('updBar');
