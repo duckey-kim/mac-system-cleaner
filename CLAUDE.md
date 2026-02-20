@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-macOS System Cleaner v1.0.0 — Auto-scans and cleans unnecessary cache/build files on macOS.
+macOS System Cleaner — Auto-scans and cleans unnecessary cache/build files on macOS.
+Version is derived from git tags (single source of truth via `app/config.py:_get_version()`).
 Uses only Python stdlib (zero external dependencies). Frontend is a single-file vanilla JS SPA.
 
 ## Commands
@@ -12,9 +13,16 @@ Uses only Python stdlib (zero external dependencies). Frontend is a single-file 
 ```bash
 python3 run.py          # Dev run (auto-opens localhost:8787)
 ./build_app.sh          # Build .app (PyInstaller, auto-installed by script)
+python3 -m pytest tests/ # Run tests (unittest-based, no external deps)
 ```
 
-No test framework. Build verification via `./build_app.sh`.
+Tests are in `tests/` (unittest-based). Build verification via `./build_app.sh`.
+
+## Git Workflow
+
+- Branch model: git flow (feature -> develop -> release -> main + tag)
+- Working branch: `develop`
+- Version tags on `main` only
 
 ## Key Rules
 

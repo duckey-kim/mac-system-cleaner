@@ -16,6 +16,8 @@ from .scanner import scan_system, scan_children
 from .cleaner import delete_path
 from .lookup import lookup_folder
 from .updater import check_update, get_cached_result, check_update_background, do_update, get_download_status
+from .tm_manager import list_snapshots, delete_snapshot, delete_all_snapshots, get_snapshots_size
+from .history import record_delete, get_history, get_stats
 
 
 def _load_html():
@@ -87,6 +89,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(result)
         elif p.path == "/api/update-status":
             self._json(get_download_status())
+        elif p.path == "/api/tm-snapshots":
+            snapshots = list_snapshots()
+            size_bytes, size_fmt = get_snapshots_size()
+            self._json({"snapshots": snapshots, "count": len(snapshots),
+                         "size_bytes": size_bytes, "size_formatted": size_fmt})
+        elif p.path == "/api/history":
+            qs = parse_qs(p.query)
+            limit = int(qs.get("limit", ["50"])[0])
+            self._json({"records": get_history(limit), "stats": get_stats()})
         else:
             self.send_response(404)
             self.end_headers()
@@ -100,13 +111,25 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = self.rfile.read(int(self.headers["Content-Length"]))
             data = json.loads(body)
             p = data.get("path", "")
+            size = data.get("size", 0)
             recreate = data.get("recreate", False)
             use_sudo = data.get("use_sudo", False)
             if not is_path_allowed(p):
                 self._json({"success": False, "code": "blocked", "message": "보안: 허용되지 않는 경로"})
             else:
                 ok, code, msg = delete_path(p, recreate, use_sudo)
+                record_delete(p, size, ok)
                 self._json({"success": ok, "code": code, "message": msg})
+        elif self.path == "/api/tm-delete":
+            body = self.rfile.read(int(self.headers["Content-Length"]))
+            data = json.loads(body)
+            date = data.get("date", "")
+            if date == "__all__":
+                s, f, msg = delete_all_snapshots()
+                self._json({"success": s > 0, "deleted": s, "failed": f, "message": msg})
+            else:
+                ok, msg = delete_snapshot(date)
+                self._json({"success": ok, "message": msg})
         else:
             self.send_response(404)
             self.end_headers()

@@ -72,5 +72,7 @@
 "com.microsoft.word":{"desc":"Microsoft 앱 데이터 (Word)","risk":"moderate","source":"pattern"},
 "com.apple.iwork.numbers":{"desc":"Apple 시스템/앱 데이터 (Numbers)","risk":"moderate","source":"pattern"},
 "com.apple.wallpaper.agent":{"desc":"Apple 시스템/앱 데이터 (agent)","risk":"moderate","source":"pattern"},
-"com.apple.addressbooksourcesync":{"desc":"Apple 시스템/앱 데이터 (AddressBookSourceSync)","risk":"moderate","source":"pattern"}
+"com.apple.addressbooksourcesync":{"desc":"Apple 시스템/앱 데이터 (AddressBookSourceSync)","risk":"moderate","source":"pattern"},
+"com.anthropic.claudefordesktop.shipit":{"desc":"com.anthropic.claudefordesktop.ShipIt 캐시 데이터. 삭제해도 재생성 가능.","risk":"safe","source":"pattern"},
+"com.figma.desktop.shipit":{"desc":"com.figma.Desktop.ShipIt 캐시 데이터. 삭제해도 재생성 가능.","risk":"safe","source":"pattern"}
 }

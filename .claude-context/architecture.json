@@ -1,5 +1,5 @@
 {
-  "_description": "macOS System Cleaner v1.0.0 architecture reference for Claude Code",
+  "_description": "macOS System Cleaner architecture reference for Claude Code",
   "entry_point": "run.py",
   "server": {
     "file": "app/server.py",
@@ -38,9 +38,32 @@
     },
     "POST /api/delete": {
       "handler": "cleaner.delete_path(path, recreate, use_sudo)",
-      "body": {"path": "str", "recreate": "bool", "use_sudo": "bool"},
+      "body": {"path": "str", "size": "int", "recreate": "bool", "use_sudo": "bool"},
       "security": "must start with HOME or /var/log",
+      "side_effect": "history.record_delete(path, size, ok)",
       "returns": "{success, code, message}"
+    },
+    "GET /api/tm-snapshots": {
+      "handler": "tm_manager.list_snapshots() + get_snapshots_size()",
+      "returns": "{snapshots: [{date, display}], count, size_bytes, size_formatted}"
+    },
+    "POST /api/tm-delete": {
+      "handler": "tm_manager.delete_snapshot(date) or delete_all_snapshots()",
+      "body": {"date": "str (date or '__all__')"},
+      "returns": "{success, message} or {success, deleted, failed, message}"
+    },
+    "GET /api/history": {
+      "handler": "history.get_history(limit) + get_stats()",
+      "params": {"limit": "int (default 50)"},
+      "returns": "{records: [{path, name, size, success, timestamp, size_formatted, time_ago}], stats: {total_deleted, total_size, ...}}"
+    },
+    "GET /api/update-status": {
+      "handler": "updater.get_download_status()",
+      "returns": "{status, progress, ...}"
+    },
+    "POST /api/do-update": {
+      "handler": "updater.do_update() in daemon thread",
+      "returns": "{started, message}"
     }
   },
   "components": {
@@ -84,14 +107,28 @@
     },
     "updater": {
       "file": "app/updater.py",
-      "exports": ["check_update()", "get_cached_result()", "check_update_background(delay)"],
+      "exports": ["check_update()", "get_cached_result()", "check_update_background(delay)", "do_update()", "get_download_status()"],
       "mechanism": "GitHub API → latest release check + learned_folders.json remote merge",
       "github_repo": "duckey-kim/mac-system-cleaner"
+    },
+    "tm_manager": {
+      "file": "app/tm_manager.py",
+      "exports": ["list_snapshots()", "delete_snapshot(date_str)", "delete_all_snapshots()", "get_snapshots_size()"],
+      "mechanism": "tmutil/diskutil subprocess calls with timeout",
+      "sudo_pattern": "sudo -n (cached) → osascript with administrator privileges (fallback)",
+      "security": "shlex.quote() for shell injection prevention"
+    },
+    "history": {
+      "file": "app/history.py",
+      "exports": ["record_delete(path, size, success)", "get_history(limit)", "get_stats()"],
+      "storage": "~/.mac_cleaner_history.json",
+      "thread_safety": "threading.Lock() for all read/write operations",
+      "limits": "FIFO 500 records max"
     },
     "frontend": {
       "file": "app/web/index.html",
       "type": "single-file SPA (HTML + CSS + JS inline)",
-      "features": ["dark theme", "infinite drill-down", "batch select/delete", "sudo modal", "real-time scan updates"],
+      "features": ["dark theme", "infinite drill-down", "batch select/delete", "sudo modal", "real-time scan updates", "TM snapshot management", "one-click safe clean", "delete history"],
       "communication": "fetch API to backend JSON endpoints"
     }
   },
@@ -100,12 +137,17 @@
       "path": "app/learned_folders.json",
       "format": {"<lowercase_folder_name>": {"desc": "string", "risk": "safe|moderate|caution"}},
       "special_key": "_comment (stripped on load)",
-      "count": "~41 predefined entries",
+      "count": "~74 predefined entries",
       "categories": ["Xcode", "Android Studio", "Flutter", "Node.js", "Homebrew", "Docker", "JetBrains", "VS Code"]
     },
     "cache_file": {
       "path": "~/.mac_cleaner_cache.json",
       "purpose": "temporary lookup results between sessions"
+    },
+    "history_file": {
+      "path": "~/.mac_cleaner_history.json",
+      "purpose": "delete operation history (FIFO 500 records)",
+      "format": "[{path, name, size, success, timestamp}, ...]"
     }
   },
   "build": {
