@@ -161,7 +161,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,san
 .hist-stat .hv{font-size:18px;font-weight:700;color:var(--gn)}
 .hist-stat .hl{font-size:10px;color:var(--t2);margin-top:2px}
 
-@media(max-width:640px){.sum{grid-template-columns:1fr}.wrap{padding:14px 14px 100px}}
+/* Category */
+.cat{margin-bottom:16px}
+.cat-head{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--s2);border:1px solid var(--bd);border-radius:10px;cursor:pointer;user-select:none;transition:background .12s;margin-bottom:8px}
+.cat-head:hover{background:var(--s3)}
+.cat-head.collapsed{margin-bottom:0;border-radius:10px}
+.cat-title{font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.cat-title .arrow{transition:transform .2s;font-size:10px;color:var(--t3)}
+.cat-title .arrow.down{transform:rotate(90deg)}
+.cat-sz{font-size:14px;font-weight:600}
+.cat-body{}
+.cat-body.hide{display:none}
+.cat-badge{font-size:10px;padding:2px 8px;border-radius:6px;background:rgba(88,166,255,.1);color:var(--ac)}
+.cat-sum{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:14px}
+.cat-sum .sc{padding:10px}
+.cat-sum .sc .v{font-size:16px}
+
+@media(max-width:640px){.sum{grid-template-columns:1fr}.wrap{padding:14px 14px 100px}.cat-sum{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -495,15 +511,17 @@ function render(){
     <button class="btn btn-a btn-sm" onclick="doScan()">다시 스캔</button>
   </div></div>`;
 
-  D.groups.forEach((g,gi)=>{
-    h+=`<div class="grp"><div class="grp-head" onclick="togGrp(${gi})">
+  // 그룹 렌더링 함수 (카테고리 유무와 무관하게 재사용)
+  function renderGroup(g,gi){
+    let gh='';
+    gh+=`<div class="grp"><div class="grp-head" onclick="togGrp(${gi})">
       <div class="grp-title">&#x1F4C2; ${g.label} <span style="font-size:11px;color:var(--t3)">(${g.items.length})</span></div>
       <div class="grp-size">${g.total_size_formatted}</div></div>
       <div class="grp-body" id="gb-${gi}">`;
 
     g.items.forEach((it,ii)=>{
       const ik=gi+'-'+ii, isSel=sel.has(ik), isDel=del_.has(it.path);
-      h+=`<div class="row ${isSel?'sel':''} ${isDel?'done':''}" id="r-${ik}">
+      gh+=`<div class="row ${isSel?'sel':''} ${isDel?'done':''}" id="r-${ik}">
         <div class="row-chk">${isDel?'':`<input type="checkbox" ${isSel?'checked':''} onchange="tog('${ik}')" />`}</div>
         <div class="row-info">
           <div class="row-nm">${it.name}
@@ -525,20 +543,20 @@ function render(){
 
       if(drills[ik]){
         const dr=drills[ik];
-        h+=`<div class="drill"><div class="drill-hd"><div class="bc">`;
+        gh+=`<div class="drill"><div class="drill-hd"><div class="bc">`;
         dr.hist.forEach((hp,hi)=>{const lb=hi===0?it.name:hp.split('/').pop();
-          h+=hi<dr.hist.length-1?`<a onclick="drillBack('${ik}',${hi})">${lb}</a><span>/</span>`:`<strong>${lb}</strong>`;});
-        h+=`</div><div style="display:flex;gap:4px"><button class="btn btn-o btn-sm" onclick="selAllChildren('${ik}')">전체 선택</button><button class="btn btn-o btn-sm" onclick="closeDrill('${ik}')">닫기</button></div></div>`;
+          gh+=hi<dr.hist.length-1?`<a onclick="drillBack('${ik}',${hi})">${lb}</a><span>/</span>`:`<strong>${lb}</strong>`;});
+        gh+=`</div><div style="display:flex;gap:4px"><button class="btn btn-o btn-sm" onclick="selAllChildren('${ik}')">전체 선택</button><button class="btn btn-o btn-sm" onclick="closeDrill('${ik}')">닫기</button></div></div>`;
 
-        if(dr.loading){h+=`<div style="padding:16px;text-align:center;color:var(--t2);font-size:12px"><div class="spin" style="width:20px;height:20px;margin:0 auto 6px;border-width:2px"></div>분석 중...</div>`;}
-        else if(!dr.children.length){h+=`<div style="padding:12px;text-align:center;color:var(--t3);font-size:12px">하위 항목 없음</div>`;}
+        if(dr.loading){gh+=`<div style="padding:16px;text-align:center;color:var(--t2);font-size:12px"><div class="spin" style="width:20px;height:20px;margin:0 auto 6px;border-width:2px"></div>분석 중...</div>`;}
+        else if(!dr.children.length){gh+=`<div style="padding:12px;text-align:center;color:var(--t3);font-size:12px">하위 항목 없음</div>`;}
         else{
           const mx=Math.max(...dr.children.map(c=>c.size));
-          h+=`<div class="drill-list">`;
+          gh+=`<div class="drill-list">`;
           dr.children.forEach(ch=>{
             const ck='c::'+ik+'::'+ch.path, cSel=sel.has(ck), cDel=del_.has(ch.path);
             const bp=pct(ch.size,mx), bclr=ch.size>524288000?'var(--rd)':ch.size>52428800?'var(--yw)':'var(--ac)';
-            h+=`<div class="crow ${cDel?'done':''}">
+            gh+=`<div class="crow ${cDel?'done':''}">
               <div class="crow-chk">${cDel||!ch.path?'':`<input type="checkbox" ${cSel?'checked':''} onchange="tog('${esc(ck)}')" />`}</div>
               <div class="crow-ic">${ch.is_dir?'&#x1F4C1;':'&#x1F4C4;'}</div>
               <div class="crow-nm ${ch.is_dir&&ch.children_count>0&&!cDel?'lnk':''}"
@@ -551,15 +569,44 @@ function render(){
               <div class="crow-sz" style="color:${szC(ch.size)}">${ch.size_formatted}</div>
               <div class="crow-act">${ch.path&&!cDel?`<button class="btn btn-o btn-sm" onclick="delOne('${esc(ch.path)}',false)">삭제</button>`:''}</div>
             </div>`;
-            if(ch.description) h+=`<div class="crow-ds">${ch.description}</div>`;
+            if(ch.description) gh+=`<div class="crow-ds">${ch.description}</div>`;
           });
-          h+=`</div>`;
+          gh+=`</div>`;
         }
-        h+=`</div>`;
+        gh+=`</div>`;
       }
     });
-    h+=`</div></div>`;
-  });
+    gh+=`</div></div>`;
+    return gh;
+  }
+
+  // 카테고리 렌더링
+  if(D.categories && D.categories.length > 1){
+    // 카테고리별 요약
+    h+='<div class="cat-sum">';
+    D.categories.forEach(cat=>{
+      h+=`<div class="sc"><div class="l">${cat.name}</div><div class="v" style="font-size:16px;color:${szC(cat.total_size)}">${cat.total_size_formatted}</div></div>`;
+    });
+    h+='</div>';
+
+    // 카테고리별 섹션
+    D.categories.forEach((cat,ci)=>{
+      const catGroups=[];
+      D.groups.forEach((g,gi)=>{ if(g.category===cat.id) catGroups.push({g,gi}); });
+      if(!catGroups.length) return;
+      h+=`<div class="cat">
+        <div class="cat-head" onclick="togCat(${ci})">
+          <div class="cat-title"><span class="arrow down" id="cat-arr-${ci}">&#x25B6;</span> ${cat.name} <span class="cat-badge">${cat.group_count}개 그룹 &middot; ${cat.total_size_formatted}</span></div>
+          <div class="cat-sz" style="color:${szC(cat.total_size)}">${cat.total_size_formatted}</div>
+        </div>
+        <div class="cat-body" id="cat-${ci}">`;
+      catGroups.forEach(({g,gi})=>{ h+=renderGroup(g,gi); });
+      h+=`</div></div>`;
+    });
+  } else {
+    // 카테고리 없으면 기존 flat 렌더링
+    D.groups.forEach((g,gi)=>{ h+=renderGroup(g,gi); });
+  }
 
   h+=`<div class="ftr">macOS System Cleaner v{{VERSION}} · 자동 스캔 · 삭제 전 백업 권장</div>`;
   document.getElementById('app').innerHTML=h;
@@ -567,6 +614,7 @@ function render(){
 }
 function esc(s){return s.replace(/'/g,"\\'");}
 function togGrp(gi){const el=document.getElementById('gb-'+gi);el.style.display=el.style.display==='none'?'block':'none';}
+function togCat(ci){const b=document.getElementById('cat-'+ci),a=document.getElementById('cat-arr-'+ci);if(b.classList.contains('hide')){b.classList.remove('hide');a.classList.add('down');}else{b.classList.add('hide');a.classList.remove('down');}}
 function updBar(){
   const bar=document.getElementById('selBar');
   if(!sel.size){bar.classList.remove('vis');return;}

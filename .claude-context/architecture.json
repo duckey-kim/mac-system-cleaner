@@ -18,8 +18,8 @@
     },
     "GET /api/scan": {
       "handler": "scanner.scan_system()",
-      "behavior": "reloads learned_folders.json before scan",
-      "returns": "list of {name, path, size, desc, risk}"
+      "behavior": "reloads learned_folders.json before scan, parallel category scan",
+      "returns": "{categories: [{id, name, total_size, group_count}], groups: [{label, path, category, items, total_size}], disk_info, tm_snapshots, total_cleanable}"
     },
     "GET /api/children": {
       "handler": "scanner.scan_children(path)",
@@ -74,16 +74,17 @@
     },
     "scanner": {
       "file": "app/scanner.py",
-      "exports": ["scan_system()", "scan_children(path)"],
-      "mechanism": "du -d1 -k via subprocess, ThreadPoolExecutor for parallel scan",
-      "scan_targets": [
-        {"path": "HOME", "min_mb": 100},
-        {"path": "~/Library", "min_mb": 50},
-        {"path": "~/Library/Caches", "min_mb": 30},
-        {"path": "~/Library/Developer", "min_mb": 50},
-        {"path": "~/Library/Application Support", "min_mb": 50},
-        {"path": "~/Library/Containers", "min_mb": 50}
-      ]
+      "exports": ["scan_system()", "scan_children(path)", "_scan_library()", "_scan_simple_dir()", "_scan_dev_caches()", "_scan_downloads()", "_scan_trash()", "_scan_media()", "_scan_system_logs()"],
+      "mechanism": "du via subprocess, ThreadPoolExecutor(max_workers=6) for parallel category scan",
+      "categories": [
+        {"id": "app_data", "name": "앱 데이터 (~/Library)", "scan": "du -d2 ~/Library", "min_group_mb": 50, "min_item_mb": 20},
+        {"id": "dev_cache", "name": "개발자 캐시", "scan": "du -d1 per dotfile dir", "paths": ["~/.npm", "~/.gradle", "~/.m2", "~/.docker", "~/.pub-cache", "~/.cocoapods", "~/.cargo", "~/.rustup", "~/.gem", "~/.composer", "~/.nuget", "~/.conda", "~/.nvm", "~/.pyenv", "~/.rbenv", "~/.yarn", "~/.pnpm-store"], "min_mb": 10},
+        {"id": "downloads", "name": "다운로드 폴더", "scan": "du -d1 ~/Downloads", "min_mb": 20},
+        {"id": "trash", "name": "휴지통", "scan": "du -d1 ~/.Trash", "min_mb": 1},
+        {"id": "media", "name": "대용량 미디어", "scan": "du -d1 ~/Movies, ~/Music", "min_mb": 50},
+        {"id": "system_logs", "name": "시스템 로그", "scan": "du -d1 /var/log", "min_mb": 5}
+      ],
+      "response_structure": "categories[] + groups[] (each group has category field)"
     },
     "cleaner": {
       "file": "app/cleaner.py",
@@ -128,7 +129,7 @@
     "frontend": {
       "file": "app/web/index.html",
       "type": "single-file SPA (HTML + CSS + JS inline)",
-      "features": ["dark theme", "infinite drill-down", "batch select/delete", "sudo modal", "real-time scan updates", "TM snapshot management", "one-click safe clean", "delete history"],
+      "features": ["dark theme", "category-based scan view", "collapsible category sections", "infinite drill-down", "batch select/delete", "sudo modal", "real-time scan updates", "TM snapshot management", "one-click safe clean", "delete history"],
       "communication": "fetch API to backend JSON endpoints"
     }
   },
@@ -137,7 +138,7 @@
       "path": "app/learned_folders.json",
       "format": {"<lowercase_folder_name>": {"desc": "string", "risk": "safe|moderate|caution"}},
       "special_key": "_comment (stripped on load)",
-      "count": "~74 predefined entries",
+      "count": "~90 predefined entries",
       "categories": ["Xcode", "Android Studio", "Flutter", "Node.js", "Homebrew", "Docker", "JetBrains", "VS Code"]
     },
     "cache_file": {
