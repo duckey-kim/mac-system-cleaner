@@ -30,8 +30,9 @@
     "subprocess_safety": "always wrap subprocess.run with (TimeoutExpired, FileNotFoundError, OSError) catch"
   },
   "performance_patterns": {
-    "du_optimization": "single 'du -d1 -k' call returns all children sizes (not per-child du calls)",
-    "parallel_scan": "ThreadPoolExecutor for 6 simultaneous path scans",
+    "du_optimization": "single 'du -d2 -k' for ~/Library, 'du -d1 -k' for other categories",
+    "parallel_scan": "ThreadPoolExecutor(max_workers=6) for 6 category scans in parallel",
+    "category_scan": "each category returns list[dict] of groups; scan_system() merges and orders by CATEGORY_ORDER",
     "html_caching": "_HTML_CACHE loaded once, served from memory",
     "lookup_batching": "web lookups batched 4 at a time"
   },
@@ -65,6 +66,9 @@
     "server uses os._exit(0) on KeyboardInterrupt for clean shutdown of all daemon threads",
     "history file (~/.mac_cleaner_history.json) is FIFO capped at 500 records to prevent unbounded growth",
     "TM snapshot size estimation falls back from tmutil → diskutil if first method returns 0",
-    "POST /api/delete now records deletion to history (side effect added in v1.1.0)"
+    "POST /api/delete now records deletion to history (side effect added in v1.1.0)",
+    "scan_system() returns 'categories' array for frontend sectioning; groups have 'category' field",
+    "empty categories (total_size=0) are excluded from the categories array",
+    "frontend render() uses renderGroup() helper for both flat and categorized views"
   ]
 }
