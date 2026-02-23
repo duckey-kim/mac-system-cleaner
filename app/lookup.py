@@ -67,6 +67,11 @@ KEYWORD_PATTERNS = [
     (r"(?i)session", "세션 데이터. 삭제 시 로그아웃됨.", "moderate"),
     (r"(?i)thumbnail|thumb", "썸네일 캐시. 삭제해도 자동 재생성.", "safe"),
     (r"(?i)index|metadata", "인덱스/메타데이터. 삭제 시 재색인 필요.", "moderate"),
+    (r"^_cacache$", "npm 내부 캐시 저장소. 삭제해도 재생성됨.", "safe"),
+    (r"^_logs$", "패키지 매니저 로그. 삭제해도 안전.", "safe"),
+    (r"^wrapper$", "Gradle wrapper 배포본. 재다운로드 가능.", "safe"),
+    (r"^repository$", "로컬 저장소. 재다운로드 가능.", "safe"),
+    (r"^(?:registry|toolchains)$", "패키지 레지스트리/툴체인 데이터.", "moderate"),
 ]
 
 
